@@ -7,6 +7,10 @@ import UnauthorizedPage from "./components/auth/UnauthorizedPage";
 import PublicationDashboard from "./modules/publication-impact/pages/PublicationDashboard";
 import ArticleDetail from "./modules/publication-impact/pages/ArticleDetail";
 import PublicArticlePage from "./modules/publication-impact/pages/PublicArticlePage";
+import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard";
+import SubmissionWorkflow from "./modules/submission/pages/SubmissionWorkflow";
+import EditorDashboard from "./modules/submission/pages/EditorDashboard";
+import EditorInChiefDashboard from "./modules/submission/pages/EditorInChiefDashboard";
 
 export const router = createBrowserRouter([
   // ── Public routes (no auth required) ──
@@ -25,7 +29,11 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <PublicationDashboard />,
+            element: <SubmissionDashboard />,
+          },
+          {
+            path: "submit",
+            element: <SubmissionWorkflow />,
           },
           {
             path: "article/:id",
@@ -56,7 +64,7 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Navigate to="/publication/dashboard" replace />,
+            element: <Navigate to="/submission/queue" replace />,
           },
           {
             path: "publication/dashboard",
@@ -65,6 +73,14 @@ export const router = createBrowserRouter([
           {
             path: "article/:id",
             element: <ArticleDetail />,
+          },
+          {
+            path: "submission/queue",
+            element: <EditorDashboard />,
+          },
+          {
+            path: "submission/screening",
+            element: <EditorInChiefDashboard />,
           },
         ],
       },
