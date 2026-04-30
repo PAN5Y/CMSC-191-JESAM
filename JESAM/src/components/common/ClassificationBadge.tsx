@@ -1,4 +1,4 @@
-import type { JournalClassification } from "@/modules/publication-impact/types";
+import type { JournalClassification } from "@/types";
 
 const classStyles: Record<JournalClassification, string> = {
   Land: "bg-[#8d6e63] text-white",
@@ -8,10 +8,17 @@ const classStyles: Record<JournalClassification, string> = {
 };
 
 interface ClassificationBadgeProps {
-  classification: JournalClassification;
+  classification: JournalClassification | null;
 }
 
 export default function ClassificationBadge({ classification }: ClassificationBadgeProps) {
+  if (!classification) {
+    return (
+      <span className="px-3 py-1 text-xs font-['Public_Sans',sans-serif] rounded-full bg-gray-200 text-gray-600">
+        Unclassified
+      </span>
+    );
+  }
   return (
     <span
       className={`px-3 py-1 text-xs font-['Public_Sans',sans-serif] rounded-full ${classStyles[classification]}`}

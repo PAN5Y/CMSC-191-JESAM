@@ -1,4 +1,4 @@
-import { NavLink } from "react-router";
+import { NavLink } from 'react-router';
 import {
   Upload,
   Users,
@@ -9,36 +9,51 @@ import {
   HelpCircle,
   Settings,
   LogOut,
-} from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Sidebar() {
   const { user, role, signOut } = useAuth();
 
-  const isAuthor = role === "author";
+  const isAuthor = role === 'author';
+  const isEic = role === 'editor_in_chief';
+  const isProduction = role === 'production_editor';
+  const isAdmin = role === 'system_admin';
+
+  const submissionPath = isAuthor
+    ? '/author'
+    : isEic
+      ? '/submission/screening'
+      : '/submission/queue';
+
+  const canAccessPublication = isAuthor || isProduction || isAdmin;
+  const publicationPath = isAuthor ? '/author' : '/publication/dashboard';
 
   const navItems = [
-    { icon: Upload, label: "Submission", to: "#", disabled: true },
-    { icon: Users, label: "Peer Review", to: "#", disabled: true },
-    { icon: Edit, label: "Revision", to: "#", disabled: true },
-    { 
-      icon: FileCheck, 
-      label: "Publication", 
-      to: isAuthor ? "/author" : "/publication/dashboard", 
-      disabled: false 
+    {
+      icon: Upload,
+      label: 'Submission',
+      to: submissionPath,
+      disabled: false,
     },
-    { icon: BookOpen, label: "Journals Dashboard", to: "#", disabled: true },
-    { icon: BarChart3, label: "Analytics Dashboard", to: "#", disabled: true },
-    { icon: HelpCircle, label: "AI Chatbot", to: "#", disabled: true },
+    { icon: Users, label: 'Peer Review', to: '#', disabled: true },
+    { icon: Edit, label: 'Revision', to: '#', disabled: true },
+    {
+      icon: FileCheck,
+      label: 'Publication',
+      to: publicationPath,
+      disabled: !canAccessPublication,
+    },
+    { icon: BookOpen, label: 'Journals Dashboard', to: '#', disabled: true },
+    { icon: BarChart3, label: 'Analytics Dashboard', to: '#', disabled: true },
+    { icon: HelpCircle, label: 'AI Chatbot', to: '#', disabled: true },
   ];
 
   return (
     <aside className="w-64 bg-[#3f4b7e] text-white flex flex-col fixed h-screen z-40">
       {/* Branding */}
       <div className="p-6 border-b border-white/10">
-        <h1 className="font-['Newsreader',serif] text-[22px] text-white mb-1">
-          JESAM
-        </h1>
+        <h1 className="font-['Newsreader',serif] text-[22px] text-white mb-1">JESAM</h1>
         <p className="text-[10px] text-white/70 font-['Public_Sans',sans-serif]">
           Journal of Environmental Science and Management
         </p>
@@ -70,8 +85,8 @@ export default function Sidebar() {
                 className={({ isActive }) =>
                   `w-full flex items-center gap-3 px-4 py-3 rounded-lg font-['Public_Sans',sans-serif] text-sm transition-colors ${
                     isActive
-                      ? "bg-[#F5C344] text-[#3f4b7e] font-medium"
-                      : "text-white/80 hover:bg-white/10"
+                      ? 'bg-[#F5C344] text-[#3f4b7e] font-medium'
+                      : 'text-white/80 hover:bg-white/10'
                   }`
                 }
               >
@@ -92,7 +107,7 @@ export default function Sidebar() {
               {user.email}
             </div>
             <div className="text-[10px] text-white/50 font-['Public_Sans',sans-serif] uppercase tracking-wider mt-0.5">
-              {role?.replace(/_/g, " ") || "User"}
+              {role?.replace(/_/g, ' ') || 'User'}
             </div>
           </div>
         )}

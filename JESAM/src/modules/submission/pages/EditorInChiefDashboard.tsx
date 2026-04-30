@@ -1,42 +1,51 @@
-import { useEffect } from 'react';
-import { EditorInChiefScreening } from '../components/EditorInChiefScreening';
-import { useSubmissions } from '../hooks/useSubmissions';
-import { Crown } from 'lucide-react';
+import { useEffect } from "react";
+import { EditorInChiefScreening } from "../components/EditorInChiefScreening";
+import { useSubmissions } from "../hooks/useSubmissions";
+import { useAuth } from "@/contexts/AuthContext";
+import { Crown } from "lucide-react";
+
+const SCREENING_STATUSES = [
+  "In Submission Queue",
+  "Administrative Check",
+  "Editor In Chief Screening",
+] as const;
 
 export default function EditorInChiefDashboard() {
-  const { manuscripts, loading, error, fetchManuscripts } = useSubmissions();
+  const { user } = useAuth();
+  const { manuscripts, loading, error, fetchManuscripts, recordScreeningDecision } =
+    useSubmissions();
 
   useEffect(() => {
-    fetchManuscripts();
-  }, []);
+    void fetchManuscripts();
+  }, [fetchManuscripts]);
 
-  const manuscriptsForScreening = manuscripts.filter(m =>
-    ['In Submission Queue', 'Administrative Check', 'Editor In Chief Screening'].includes(m.status)
+  const manuscriptsForScreening = manuscripts.filter((m) =>
+    SCREENING_STATUSES.includes(m.status as (typeof SCREENING_STATUSES)[number])
   );
+
+  const decidedBy = user?.email ?? user?.id ?? "unknown";
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center gap-3">
             <Crown className="w-8 h-8 text-amber-600" />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Editor-in-Chief Screening</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Editor-in-Chief screening</h1>
               <p className="text-gray-600 mt-1">
-                Review and make decisions on manuscript submissions
+                Review new submissions immediately and issue desk decisions before peer review.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div>
-              <p className="text-sm text-gray-600">For Review</p>
+              <p className="text-sm text-gray-600">For screening</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
                 {manuscriptsForScreening.length}
               </p>
@@ -44,17 +53,17 @@ export default function EditorInChiefDashboard() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div>
-              <p className="text-sm text-gray-600">In Submission Queue</p>
+              <p className="text-sm text-gray-600">In submission queue</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {manuscripts.filter(m => m.status === 'In Submission Queue').length}
+                {manuscripts.filter((m) => m.status === "In Submission Queue").length}
               </p>
             </div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div>
-              <p className="text-sm text-gray-600">Peer Review</p>
+              <p className="text-sm text-gray-600">Peer review</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {manuscripts.filter(m => m.status === 'Peer Review').length}
+                {manuscripts.filter((m) => m.status === "Peer Review").length}
               </p>
             </div>
           </div>
@@ -62,14 +71,13 @@ export default function EditorInChiefDashboard() {
             <div>
               <p className="text-sm text-gray-600">Published</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {manuscripts.filter(m => m.status === 'Published').length}
+                {manuscripts.filter((m) => m.status === "Published").length}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
@@ -87,9 +95,16 @@ export default function EditorInChiefDashboard() {
         ) : manuscriptsForScreening.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600">No manuscripts available for screening</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Newly submitted manuscripts appear here immediately, including those still in editor verification.
+            </p>
           </div>
         ) : (
-          <EditorInChiefScreening />
+          <EditorInChiefScreening
+            manuscripts={manuscriptsForScreening}
+            decidedBy={decidedBy}
+            onScreeningSubmit={recordScreeningDecision}
+          />
         )}
       </div>
     </div>

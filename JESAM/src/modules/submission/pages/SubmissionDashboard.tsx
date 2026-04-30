@@ -9,8 +9,8 @@ export default function SubmissionDashboard() {
   const { manuscripts, loading, error, fetchManuscripts } = useSubmissions();
 
   useEffect(() => {
-    fetchManuscripts();
-  }, []);
+    void fetchManuscripts();
+  }, [fetchManuscripts]);
 
   const handleNewSubmission = () => {
     navigate('/author/submit');
@@ -28,13 +28,14 @@ export default function SubmissionDashboard() {
                 Track the status of your manuscript submissions
               </p>
             </div>
-            {/* <button
+            <button
+              type="button"
               onClick={handleNewSubmission}
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-5 h-5" />
               New Submission
-            </button> */}
+            </button>
           </div>
         </div>
       </div>
@@ -66,7 +67,10 @@ export default function SubmissionDashboard() {
             </button>
           </div>
         ) : (
-          <SubmissionsTable onNewSubmission={handleNewSubmission} />
+          <SubmissionsTable
+            manuscripts={manuscripts}
+            onNewSubmission={handleNewSubmission}
+          />
         )}
       </div>
     </div>

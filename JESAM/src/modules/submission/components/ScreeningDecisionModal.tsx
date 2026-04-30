@@ -1,56 +1,90 @@
-import { useState } from 'react';
-import { X, XCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState } from "react";
+import { X, XCircle, AlertCircle, CheckCircle } from "lucide-react";
+import type { ScreeningDecision, EditorDecision } from "../types";
 
-interface Manuscript {
+export interface ScreeningManuscriptSummary {
   id: string;
-  manuscriptId: string;
+  referenceLabel: string;
   title: string;
-  authors: string;
-  classification: string;
+  authorsDisplay: string;
+  classification: string | null;
 }
 
 interface ScreeningDecisionModalProps {
-  manuscript: Manuscript;
+  manuscript: ScreeningManuscriptSummary;
+  decidedBy: string;
   onClose: () => void;
   onBack: () => void;
+  onSubmit: (decision: ScreeningDecision) => Promise<void>;
 }
 
-export function ScreeningDecisionModal({ manuscript, onClose, onBack }: ScreeningDecisionModalProps) {
-  const [rejectionReason, setRejectionReason] = useState('Not aligned with JESAM theme');
-  const [comments, setComments] = useState('');
+export function ScreeningDecisionModal({
+  manuscript,
+  decidedBy,
+  onClose,
+  onBack,
+  onSubmit,
+}: ScreeningDecisionModalProps) {
+  const [rejectionReason, setRejectionReason] = useState("Not aligned with JESAM theme");
+  const [comments, setComments] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const rejectionReasons = [
-    'Not aligned with JESAM theme',
-    'Insufficient methodological rigor',
-    'Scope too narrow or too broad',
-    'Language quality issues',
-    'Ethical concerns',
-    'Duplicate submission',
-    'Other (specify in comments)',
+    "Not aligned with JESAM theme",
+    "Insufficient methodological rigor",
+    "Scope too narrow or too broad",
+    "Language quality issues",
+    "Ethical concerns",
+    "Duplicate submission",
+    "Other (specify in comments)",
   ];
 
-  const handleReject = () => {
-    alert(`Manuscript ${manuscript.manuscriptId} rejected (Out of Scope)\nReason: ${rejectionReason}\nComments: ${comments}`);
-    onClose();
+  const buildDecision = (decision: EditorDecision): ScreeningDecision => ({
+    id: manuscript.id,
+    decision,
+    rejectionReason: decision === "reject" ? rejectionReason : undefined,
+    comments: comments.trim() || undefined,
+    decidedAt: new Date().toISOString(),
+    decidedBy,
+  });
+
+  const handleReject = async () => {
+    setSubmitting(true);
+    try {
+      await onSubmit(buildDecision("reject"));
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleReturnForFormatting = () => {
-    alert(`Manuscript ${manuscript.manuscriptId} returned for formatting fix\nComments: ${comments}`);
-    onClose();
+  const handleReturnForFormatting = async () => {
+    setSubmitting(true);
+    try {
+      await onSubmit(buildDecision("return-for-formatting"));
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleApprove = () => {
-    alert(`Manuscript ${manuscript.manuscriptId} approved for peer review\nComments: ${comments}`);
-    onClose();
+  const handleApprove = async () => {
+    setSubmitting(true);
+    try {
+      await onSubmit(buildDecision("approve"));
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Manuscript Details</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Screening decision</h2>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
           >
@@ -58,15 +92,16 @@ export function ScreeningDecisionModal({ manuscript, onClose, onBack }: Screenin
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Section Title */}
-          <h3 className="text-lg font-semibold text-gray-900">Screening Decision</h3>
+          <p className="text-sm text-gray-600">
+            <span className="font-medium text-gray-900">{manuscript.referenceLabel}</span>
+            {" — "}
+            {manuscript.title}
+          </p>
 
-          {/* Rejection Reason */}
           <div>
             <label htmlFor="rejectionReason" className="block text-sm font-medium text-gray-900 mb-2">
-              Rejection Reason <span className="text-gray-500">(required for reject)</span>
+              Rejection reason <span className="text-gray-500">(for reject)</span>
             </label>
             <select
               id="rejectionReason"
@@ -82,10 +117,9 @@ export function ScreeningDecisionModal({ manuscript, onClose, onBack }: Screenin
             </select>
           </div>
 
-          {/* Editor Comments */}
           <div>
             <label htmlFor="comments" className="block text-sm font-medium text-gray-900 mb-2">
-              Editor-in-Chief Comments
+              Editor-in-Chief comments
             </label>
             <textarea
               id="comments"
@@ -97,35 +131,43 @@ export function ScreeningDecisionModal({ manuscript, onClose, onBack }: Screenin
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-3 gap-3 pt-4">
-            {/* Reject */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
             <button
-              onClick={handleReject}
-              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+              type="button"
+              disabled={submitting}
+              onClick={() => void handleReject()}
+              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
             >
               <XCircle className="w-6 h-6" />
-              <span className="text-sm">Reject (Out of Scope)</span>
+              <span className="text-sm">Reject (out of scope)</span>
             </button>
 
-            {/* Return for Formatting */}
             <button
-              onClick={handleReturnForFormatting}
-              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition-colors"
+              type="button"
+              disabled={submitting}
+              onClick={() => void handleReturnForFormatting()}
+              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition-colors disabled:opacity-50"
             >
               <AlertCircle className="w-6 h-6" />
-              <span className="text-sm">Return for Formatting Fix</span>
+              <span className="text-sm">Return for formatting</span>
             </button>
 
-            {/* Approve */}
             <button
-              onClick={handleApprove}
-              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-[#3d4a6b] text-white rounded-lg font-medium hover:bg-[#4a5875] transition-colors"
+              type="button"
+              disabled={submitting}
+              onClick={() => void handleApprove()}
+              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-[#3d4a6b] text-white rounded-lg font-medium hover:bg-[#4a5875] transition-colors disabled:opacity-50"
             >
               <CheckCircle className="w-6 h-6" />
-              <span className="text-sm">Approve for Peer Review</span>
+              <span className="text-sm">Approve for peer review</span>
             </button>
           </div>
+        </div>
+
+        <div className="p-4 border-t border-gray-200 flex justify-start">
+          <button type="button" onClick={onBack} className="text-sm text-gray-600 hover:text-gray-900">
+            Back to details
+          </button>
         </div>
       </div>
     </div>

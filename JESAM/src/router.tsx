@@ -11,6 +11,27 @@ import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard"
 import SubmissionWorkflow from "./modules/submission/pages/SubmissionWorkflow";
 import EditorDashboard from "./modules/submission/pages/EditorDashboard";
 import EditorInChiefDashboard from "./modules/submission/pages/EditorInChiefDashboard";
+import { useAuth } from "./contexts/AuthContext";
+
+function InternalHomeRedirect() {
+  const { role } = useAuth();
+
+  if (role === "editor_in_chief") {
+    return <Navigate to="/submission/screening" replace />;
+  }
+
+  if (role === "production_editor") {
+    return <Navigate to="/publication/dashboard" replace />;
+  }
+
+  // Associate/managing editors default to technical intake queue.
+  if (role === "associate_editor" || role === "managing_editor") {
+    return <Navigate to="/submission/queue" replace />;
+  }
+
+  // System admin can start from queue.
+  return <Navigate to="/submission/queue" replace />;
+}
 
 export const router = createBrowserRouter([
   // ── Public routes (no auth required) ──
@@ -44,7 +65,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // ── Editor / Admin routes ──
+  // ── Internal landing (role-aware) ──
   {
     path: "/",
     element: (
@@ -64,25 +85,71 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Navigate to="/submission/queue" replace />,
-          },
-          {
-            path: "publication/dashboard",
-            element: <PublicationDashboard />,
-          },
-          {
-            path: "article/:id",
-            element: <ArticleDetail />,
-          },
-          {
-            path: "submission/queue",
-            element: <EditorDashboard />,
-          },
-          {
-            path: "submission/screening",
-            element: <EditorInChiefDashboard />,
+            element: <InternalHomeRedirect />,
           },
         ],
+      },
+    ],
+  },
+
+  // ── Editor technical queue (non-EIC) ──
+  {
+    path: "/submission/queue",
+    element: (
+      <ProtectedRoute
+        allowedRoles={["associate_editor", "managing_editor", "system_admin"]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <EditorDashboard /> }],
+      },
+    ],
+  },
+
+  // ── EIC screening ──
+  {
+    path: "/submission/screening",
+    element: <ProtectedRoute allowedRoles={["editor_in_chief", "system_admin"]} />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <EditorInChiefDashboard /> }],
+      },
+    ],
+  },
+
+  // ── Publication / Production routes ──
+  {
+    path: "/publication/dashboard",
+    element: <ProtectedRoute allowedRoles={["production_editor", "system_admin"]} />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <PublicationDashboard /> }],
+      },
+    ],
+  },
+
+  // ── Internal manuscript detail (used by allowed internal roles) ──
+  {
+    path: "/article/:id",
+    element: (
+      <ProtectedRoute
+        allowedRoles={[
+          "associate_editor",
+          "managing_editor",
+          "production_editor",
+          "editor_in_chief",
+          "system_admin",
+        ]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <ArticleDetail /> }],
       },
     ],
   },

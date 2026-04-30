@@ -1,37 +1,10 @@
-// Author Information
-export interface Author {
-  id: string;
-  name: string;
-  email: string;
-  orcid?: string;
-  affiliation: string;
-  isCorresponding: boolean;
-}
+import type { ComponentType } from "react";
+import type { SubmissionAuthorDetail } from "@/types";
 
-// Manuscript/Publication
-export interface Manuscript {
-  id: string;
-  manuscriptId: string;
-  dateSubmitted: string;
-  title: string;
-  authors: Author[];
-  abstract: string;
-  keywords: string[];
-  classification: 'Land' | 'Air' | 'Water' | 'People';
-  status: SubmissionStatus;
-  similarity?: number; // Plagiarism percentage
-  formattingStatus?: 'passed' | 'failed' | 'pending';
-}
+/** Author row in the submission wizard (same shape as stored in submission_metadata). */
+export type Author = SubmissionAuthorDetail;
 
-export type SubmissionStatus = 
-  | 'In Submission Queue'
-  | 'Administrative Check'
-  | 'Editor In Chief Screening'
-  | 'Peer Review'
-  | 'Published'
-  | 'Rejected';
-
-// Research Metadata
+// Research Metadata (wizard step 1)
 export interface ResearchMetadata {
   title: string;
   abstract: string;
@@ -44,7 +17,7 @@ export interface ResearchMetadata {
 }
 
 // Automated Check Results
-export type CheckStatus = 'pending' | 'checking' | 'passed' | 'failed';
+export type CheckStatus = "pending" | "checking" | "passed" | "failed";
 
 export interface AutomatedCheckResult {
   formatting: {
@@ -73,15 +46,16 @@ export interface AdministrativeDeclarations {
 export interface SubmissionStep {
   id: number;
   title: string;
-  icon: React.ComponentType<any>;
-  component: React.ComponentType<any>;
+  icon: ComponentType<unknown>;
+  component: ComponentType<unknown>;
 }
 
 // Editor Decision
-export type EditorDecision = 'approve' | 'reject' | 'return-for-formatting';
+export type EditorDecision = "approve" | "reject" | "return-for-formatting";
 
+/** EIC / screening decision; `id` is the manuscripts row UUID. */
 export interface ScreeningDecision {
-  manuscriptId: string;
+  id: string;
   decision: EditorDecision;
   rejectionReason?: string;
   comments?: string;
