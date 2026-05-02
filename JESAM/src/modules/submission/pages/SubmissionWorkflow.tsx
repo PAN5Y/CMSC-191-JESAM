@@ -35,7 +35,7 @@ function SubmissionWorkflowInner() {
     { id: "metadata" as const, title: "Research Metadata", icon: FileText },
     { id: "authors" as const, title: "Author Information", icon: Users },
     { id: "checks" as const, title: "Automated Checks", icon: CheckCircle2 },
-    { id: "admin" as const, title: "Administrative Check", icon: Shield },
+    { id: "admin" as const, title: "Author Declarations", icon: Shield },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);

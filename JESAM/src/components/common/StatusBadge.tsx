@@ -3,15 +3,10 @@ import type { ManuscriptStatus } from "@/types";
 const statusConfig: Partial<
   Record<ManuscriptStatus, { bg: string; text: string; label: string }>
 > = {
-  "In Submission Queue": {
+  "Pending Format Verification": {
     bg: "bg-[#e3f2fd]",
     text: "text-[#1565c0]",
-    label: "In Submission Queue",
-  },
-  "Administrative Check": {
-    bg: "bg-[#fff3e0]",
-    text: "text-[#e65100]",
-    label: "Administrative Check",
+    label: "Format verification",
   },
   "Editor In Chief Screening": {
     bg: "bg-[#fce4ec]",
@@ -27,6 +22,11 @@ const statusConfig: Partial<
     bg: "bg-[#fff8e1]",
     text: "text-[#f57f17]",
     label: "Returned to Author",
+  },
+  "Revision Requested": {
+    bg: "bg-[#fff8e1]",
+    text: "text-[#ef6c00]",
+    label: "Revision Requested",
   },
   Rejected: {
     bg: "bg-[#ffebee]",

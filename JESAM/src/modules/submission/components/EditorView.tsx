@@ -48,9 +48,10 @@ export function EditorView({ manuscript, onBack, onApprove, onReject }: EditorVi
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Editor verification</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Format verification</h2>
           <p className="text-sm text-gray-600">
-            Review automated checks and verify manuscript compliance
+            Confirm automated template and quality checks. Approve to send to Editor-in-Chief
+            screening, or return to the author with comments.
           </p>
         </div>
       </div>
@@ -203,8 +204,8 @@ export function EditorView({ manuscript, onBack, onApprove, onReject }: EditorVi
               {decision === "approve" && <CheckCircle2 className="w-4 h-4 text-white" />}
             </div>
             <div className="flex-1 text-left">
-              <p className="font-medium text-gray-900">Approve — send to administrative check</p>
-              <p className="text-sm text-gray-600">Manuscript is ready for the next editorial stage.</p>
+              <p className="font-medium text-gray-900">Forward to EIC screening</p>
+              <p className="text-sm text-gray-600">Manuscript is ready for Editor-in-Chief screening.</p>
             </div>
           </button>
 
@@ -268,8 +269,8 @@ export function EditorView({ manuscript, onBack, onApprove, onReject }: EditorVi
       <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div className="text-sm text-blue-900">
-          <p className="font-medium mb-1">Editor verification</p>
-          <p>Verify automated screening results before advancing the manuscript in the workflow.</p>
+          <p className="font-medium mb-1">Editorial support review</p>
+          <p>Support checks only; initial submission decisions are finalized in EIC screening.</p>
         </div>
       </div>
     </div>

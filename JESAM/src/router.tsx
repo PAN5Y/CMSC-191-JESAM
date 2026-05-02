@@ -11,26 +11,23 @@ import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard"
 import SubmissionWorkflow from "./modules/submission/pages/SubmissionWorkflow";
 import EditorDashboard from "./modules/submission/pages/EditorDashboard";
 import EditorInChiefDashboard from "./modules/submission/pages/EditorInChiefDashboard";
+import PeerReviewDashboard from "./modules/peer-review/pages/PeerReviewDashboard";
+import ReviewerPortal from "./modules/peer-review/pages/ReviewerPortal";
+import RevisionDashboard from "./modules/revision/pages/RevisionDashboard";
+import JournalsDashboard from "./modules/journals-dashboard/pages/JournalsDashboard";
+import AnalyticsDashboard from "./modules/analytics-dashboard/pages/AnalyticsDashboard";
+import AIChatbotPage from "./modules/ai-chatbot/pages/AIChatbotPage";
 import { useAuth } from "./contexts/AuthContext";
+import { getWorkspaceHomePath } from "./lib/workspace-routing";
 
 function InternalHomeRedirect() {
   const { role } = useAuth();
 
-  if (role === "editor_in_chief") {
-    return <Navigate to="/submission/screening" replace />;
+  if (!role) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (role === "production_editor") {
-    return <Navigate to="/publication/dashboard" replace />;
-  }
-
-  // Associate/managing editors default to technical intake queue.
-  if (role === "associate_editor" || role === "managing_editor") {
-    return <Navigate to="/submission/queue" replace />;
-  }
-
-  // System admin can start from queue.
-  return <Navigate to="/submission/queue" replace />;
+  return <Navigate to={getWorkspaceHomePath(role)} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -39,6 +36,9 @@ export const router = createBrowserRouter([
   { path: "/register", element: <RegisterPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
   { path: "/article/public/:id", element: <PublicArticlePage /> },
+  { path: "/browse", element: <JournalsDashboard /> },
+  { path: "/journals/public", element: <Navigate to="/browse" replace /> },
+  { path: "/journals", element: <Navigate to="/browse" replace /> },
 
   // ── Author-only routes ──
   {
@@ -72,6 +72,7 @@ export const router = createBrowserRouter([
       <ProtectedRoute
         allowedRoles={[
           "production_editor",
+          "reviewer",
           "managing_editor",
           "associate_editor",
           "editor_in_chief",
@@ -92,7 +93,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // ── Editor technical queue (non-EIC) ──
+  // ── Submission support view (non-EIC) ──
   {
     path: "/submission/queue",
     element: (
@@ -132,6 +133,90 @@ export const router = createBrowserRouter([
     ],
   },
 
+  // ── Peer review operations (editorial) ──
+  {
+    path: "/peer-review",
+    element: (
+      <ProtectedRoute
+        allowedRoles={["associate_editor", "managing_editor", "editor_in_chief", "system_admin"]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <PeerReviewDashboard /> }],
+      },
+    ],
+  },
+
+  // ── Reviewer portal ──
+  {
+    path: "/peer-review/reviewer",
+    element: <ProtectedRoute allowedRoles={["reviewer", "system_admin"]} />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <ReviewerPortal /> }],
+      },
+    ],
+  },
+
+  // ── Revision cycle ──
+  {
+    path: "/revision",
+    element: (
+      <ProtectedRoute
+        allowedRoles={["author", "associate_editor", "managing_editor", "editor_in_chief", "system_admin"]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <RevisionDashboard /> }],
+      },
+    ],
+  },
+
+  // ── Analytics dashboard ──
+  {
+    path: "/analytics",
+    element: (
+      <ProtectedRoute
+        allowedRoles={["associate_editor", "managing_editor", "production_editor", "editor_in_chief", "system_admin"]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <AnalyticsDashboard /> }],
+      },
+    ],
+  },
+
+  // ── AI chatbot ──
+  {
+    path: "/ai-chatbot",
+    element: (
+      <ProtectedRoute
+        allowedRoles={[
+          "author",
+          "reviewer",
+          "associate_editor",
+          "managing_editor",
+          "production_editor",
+          "editor_in_chief",
+          "system_admin",
+        ]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <AIChatbotPage /> }],
+      },
+    ],
+  },
+
   // ── Internal manuscript detail (used by allowed internal roles) ──
   {
     path: "/article/:id",
@@ -140,6 +225,7 @@ export const router = createBrowserRouter([
         allowedRoles={[
           "associate_editor",
           "managing_editor",
+          "reviewer",
           "production_editor",
           "editor_in_chief",
           "system_admin",

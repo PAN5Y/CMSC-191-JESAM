@@ -1,6 +1,6 @@
-import { Plus } from "lucide-react";
-import { useNavigate } from "react-router";
-import type { Manuscript, ManuscriptStatus } from "@/types";
+import { Plus } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import type { Manuscript, ManuscriptStatus } from '@/types';
 
 interface SubmissionsTableProps {
   manuscripts: Manuscript[];
@@ -9,44 +9,44 @@ interface SubmissionsTableProps {
 
 function getClassificationColor(classification: string | null) {
   switch (classification) {
-    case "Land":
-      return "bg-amber-100 text-amber-800";
-    case "Air":
-      return "bg-cyan-100 text-cyan-800";
-    case "Water":
-      return "bg-blue-100 text-blue-800";
-    case "People":
-      return "bg-purple-100 text-purple-800";
+    case 'Land':
+      return 'bg-amber-100 text-amber-800';
+    case 'Air':
+      return 'bg-cyan-100 text-cyan-800';
+    case 'Water':
+      return 'bg-blue-100 text-blue-800';
+    case 'People':
+      return 'bg-purple-100 text-purple-800';
     default:
-      return "bg-gray-100 text-gray-800";
+      return 'bg-gray-100 text-gray-800';
   }
 }
 
 function getStatusColor(status: ManuscriptStatus) {
   switch (status) {
-    case "In Submission Queue":
-      return "bg-yellow-100 text-yellow-800";
-    case "Administrative Check":
-      return "bg-orange-100 text-orange-800";
-    case "Editor In Chief Screening":
-      return "bg-pink-100 text-pink-800";
-    case "Peer Review":
-      return "bg-indigo-100 text-indigo-800";
-    case "Returned to Author":
-      return "bg-amber-100 text-amber-900";
-    case "Rejected":
-      return "bg-red-100 text-red-800";
-    case "Accepted":
-    case "In Production":
-      return "bg-teal-100 text-teal-800";
-    case "Published":
-      return "bg-green-100 text-green-800";
-    case "Return to Revision":
-      return "bg-orange-100 text-orange-900";
-    case "Retracted":
-      return "bg-slate-800 text-white";
+    case 'Pending Format Verification':
+      return 'bg-sky-100 text-sky-900';
+    case 'Editor In Chief Screening':
+      return 'bg-pink-100 text-pink-800';
+    case 'Peer Review':
+      return 'bg-indigo-100 text-indigo-800';
+    case 'Revision Requested':
+      return 'bg-orange-100 text-orange-900';
+    case 'Returned to Author':
+      return 'bg-amber-100 text-amber-900';
+    case 'Rejected':
+      return 'bg-red-100 text-red-800';
+    case 'Accepted':
+    case 'In Production':
+      return 'bg-teal-100 text-teal-800';
+    case 'Published':
+      return 'bg-green-100 text-green-800';
+    case 'Return to Revision':
+      return 'bg-orange-100 text-orange-900';
+    case 'Retracted':
+      return 'bg-slate-800 text-white';
     default:
-      return "bg-gray-100 text-gray-800";
+      return 'bg-gray-100 text-gray-800';
   }
 }
 
@@ -62,14 +62,6 @@ export function SubmissionsTable({ manuscripts, onNewSubmission }: SubmissionsTa
             Track the status of your submissions and open a manuscript for details.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onNewSubmission}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#3d4a6b] text-white rounded-lg font-medium hover:bg-[#4a5875] transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          New Submission
-        </button>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -100,8 +92,8 @@ export function SubmissionsTable({ manuscripts, onNewSubmission }: SubmissionsTa
             {manuscripts.map((manuscript) => {
               const ref = manuscript.reference_code ?? manuscript.id.slice(0, 8).toUpperCase();
               const dateStr = new Date(manuscript.created_at).toLocaleDateString();
-              const authorsDisplay = manuscript.authors.join(", ");
-              const cls = manuscript.classification ?? "—";
+              const authorsDisplay = manuscript.authors.join(', ');
+              const cls = manuscript.classification ?? '—';
 
               return (
                 <tr key={manuscript.id} className="hover:bg-gray-50 transition-colors">

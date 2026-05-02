@@ -9,6 +9,7 @@ import {
 } from "@/lib/manuscripts-db";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Manuscript, ManuscriptStatus, ReadinessStatus } from "../types";
+import { appendAudit, appendNotification } from "@/lib/workflow";
 
 export interface UseManuscriptsOptions {
   filterStatus?: ManuscriptStatus;
@@ -191,6 +192,15 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
       const updates: Partial<Manuscript> = {
         status: "Published",
         published_at: new Date().toISOString(),
+        submission_metadata: {
+          ...(manuscript.submission_metadata ?? {}),
+          notifications: appendNotification(manuscript, {
+            type: "published",
+            recipientRole: "public",
+            message: `${manuscript.reference_code ?? manuscript.id} is now published.`,
+          }),
+          audit_logs: appendAudit(manuscript, "production_editor", "published"),
+        },
       };
 
       const success = await updateManuscript(id, updates);
@@ -214,19 +224,42 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
 
   const returnToRevision = useCallback(
     async (id: string) => {
+      const manuscript = manuscripts.find((m) => m.id === id);
+      const reference = manuscript?.reference_code ?? manuscript?.id ?? id;
       const success = await updateManuscript(id, {
-        status: "Return to Revision" as ManuscriptStatus,
+        status: "Revision Requested" as ManuscriptStatus,
+        submission_metadata: {
+          ...(manuscript?.submission_metadata ?? {}),
+          notifications: appendNotification(manuscript ?? ({} as Manuscript), {
+            type: "revision-requested",
+            recipientRole: "author",
+            message: `${reference} was returned by production for revision.`,
+          }),
+          audit_logs: appendAudit(
+            manuscript ?? ({} as Manuscript),
+            "production_editor",
+            "returned-to-revision"
+          ),
+        },
       });
-      if (success) toast.success("Manuscript returned to revision");
+      if (success) toast.success("Manuscript returned to author for revision");
       return success;
     },
-    [updateManuscript]
+    [manuscripts, updateManuscript]
   );
 
   const retractManuscript = useCallback(
     async (id: string) => {
       const success = await updateManuscript(id, {
         status: "Retracted" as ManuscriptStatus,
+        submission_metadata: {
+          ...(manuscripts.find((m) => m.id === id)?.submission_metadata ?? {}),
+          audit_logs: appendAudit(
+            manuscripts.find((m) => m.id === id) ?? ({} as Manuscript),
+            "production_editor",
+            "retracted"
+          ),
+        },
       });
       if (success) toast.error("Article has been retracted");
       return success;

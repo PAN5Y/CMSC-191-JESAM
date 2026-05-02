@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { X, XCircle, AlertCircle, CheckCircle } from "lucide-react";
-import type { ScreeningDecision, EditorDecision } from "../types";
+import { useState } from 'react';
+import { X, XCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import type { ScreeningDecision, EditorDecision } from '../types';
 
 export interface ScreeningManuscriptSummary {
   id: string;
@@ -25,24 +25,24 @@ export function ScreeningDecisionModal({
   onBack,
   onSubmit,
 }: ScreeningDecisionModalProps) {
-  const [rejectionReason, setRejectionReason] = useState("Not aligned with JESAM theme");
-  const [comments, setComments] = useState("");
+  const [rejectionReason, setRejectionReason] = useState('Not aligned with JESAM theme');
+  const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const rejectionReasons = [
-    "Not aligned with JESAM theme",
-    "Insufficient methodological rigor",
-    "Scope too narrow or too broad",
-    "Language quality issues",
-    "Ethical concerns",
-    "Duplicate submission",
-    "Other (specify in comments)",
+    'Not aligned with JESAM theme',
+    'Insufficient methodological rigor',
+    'Scope too narrow or too broad',
+    'Language quality issues',
+    'Ethical concerns',
+    'Duplicate submission',
+    'Other (specify in comments)',
   ];
 
   const buildDecision = (decision: EditorDecision): ScreeningDecision => ({
     id: manuscript.id,
     decision,
-    rejectionReason: decision === "reject" ? rejectionReason : undefined,
+    rejectionReason: decision === 'reject' ? rejectionReason : undefined,
     comments: comments.trim() || undefined,
     decidedAt: new Date().toISOString(),
     decidedBy,
@@ -51,17 +51,17 @@ export function ScreeningDecisionModal({
   const handleReject = async () => {
     setSubmitting(true);
     try {
-      await onSubmit(buildDecision("reject"));
+      await onSubmit(buildDecision('reject'));
       onClose();
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleReturnForFormatting = async () => {
+  const handleReturnToAuthor = async () => {
     setSubmitting(true);
     try {
-      await onSubmit(buildDecision("return-for-formatting"));
+      await onSubmit(buildDecision('return-to-author'));
       onClose();
     } finally {
       setSubmitting(false);
@@ -71,7 +71,7 @@ export function ScreeningDecisionModal({
   const handleApprove = async () => {
     setSubmitting(true);
     try {
-      await onSubmit(buildDecision("approve"));
+      await onSubmit(buildDecision('approve'));
       onClose();
     } finally {
       setSubmitting(false);
@@ -79,7 +79,7 @@ export function ScreeningDecisionModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Screening decision</h2>
@@ -95,12 +95,15 @@ export function ScreeningDecisionModal({
         <div className="p-6 space-y-6">
           <p className="text-sm text-gray-600">
             <span className="font-medium text-gray-900">{manuscript.referenceLabel}</span>
-            {" — "}
+            {' — '}
             {manuscript.title}
           </p>
 
           <div>
-            <label htmlFor="rejectionReason" className="block text-sm font-medium text-gray-900 mb-2">
+            <label
+              htmlFor="rejectionReason"
+              className="block text-sm font-medium text-gray-900 mb-2"
+            >
               Rejection reason <span className="text-gray-500">(for reject)</span>
             </label>
             <select
@@ -145,11 +148,11 @@ export function ScreeningDecisionModal({
             <button
               type="button"
               disabled={submitting}
-              onClick={() => void handleReturnForFormatting()}
+              onClick={() => void handleReturnToAuthor()}
               className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition-colors disabled:opacity-50"
             >
               <AlertCircle className="w-6 h-6" />
-              <span className="text-sm">Return for formatting</span>
+              <span className="text-sm">Return to author</span>
             </button>
 
             <button
@@ -165,7 +168,11 @@ export function ScreeningDecisionModal({
         </div>
 
         <div className="p-4 border-t border-gray-200 flex justify-start">
-          <button type="button" onClick={onBack} className="text-sm text-gray-600 hover:text-gray-900">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-sm text-gray-600 hover:text-gray-900"
+          >
             Back to details
           </button>
         </div>

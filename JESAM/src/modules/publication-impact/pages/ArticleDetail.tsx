@@ -405,6 +405,45 @@ export default function ArticleDetail() {
         </div>
 
         {/* Footer Info */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-4 bg-white rounded-lg border border-[#e0e0e0]">
+            <h3 className="font-['Newsreader',serif] text-[18px] text-[#1a1c1c] mb-3">
+              Notification Log
+            </h3>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {(manuscript.submission_metadata?.notifications ?? []).map((n) => (
+                <div key={n.id} className="p-2 border border-[#e0e0e0] rounded">
+                  <p className="text-xs uppercase text-[#6b7280]">{n.type}</p>
+                  <p className="text-sm text-[#1a1c1c]">{n.message}</p>
+                  <p className="text-xs text-[#9e9e9e]">{new Date(n.createdAt).toLocaleString()}</p>
+                </div>
+              ))}
+              {(manuscript.submission_metadata?.notifications ?? []).length === 0 && (
+                <p className="text-sm text-[#6b7280]">No notifications recorded yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 bg-white rounded-lg border border-[#e0e0e0]">
+            <h3 className="font-['Newsreader',serif] text-[18px] text-[#1a1c1c] mb-3">
+              Workflow Audit Trail
+            </h3>
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {(manuscript.submission_metadata?.audit_logs ?? []).map((a) => (
+                <div key={a.id} className="p-2 border border-[#e0e0e0] rounded">
+                  <p className="text-xs uppercase text-[#6b7280]">{a.action}</p>
+                  <p className="text-sm text-[#1a1c1c]">Actor: {a.actor}</p>
+                  {a.note && <p className="text-sm text-[#6b7280]">{a.note}</p>}
+                  <p className="text-xs text-[#9e9e9e]">{new Date(a.createdAt).toLocaleString()}</p>
+                </div>
+              ))}
+              {(manuscript.submission_metadata?.audit_logs ?? []).length === 0 && (
+                <p className="text-sm text-[#6b7280]">No audit entries recorded yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="mt-12 p-6 bg-white rounded-lg border border-[#e0e0e0]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

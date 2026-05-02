@@ -51,7 +51,8 @@ export function EditorInChiefScreening({
           <div>
             <h4 className="text-sm font-semibold text-blue-900 mb-1">Editor screening process</h4>
             <p className="text-sm text-blue-800">
-              Editor-in-Chief can desk-reject immediately (including new submissions in queue), while editor technical verification routes manuscripts into this screening stage.
+              Editor-in-Chief performs initial screening decisions for new submissions: return to
+              author, desk reject, or proceed to peer review.
             </p>
           </div>
         </div>

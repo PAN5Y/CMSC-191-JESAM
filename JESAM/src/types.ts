@@ -4,10 +4,10 @@
  */
 
 export type ManuscriptStatus =
-  | "In Submission Queue"
-  | "Administrative Check"
+  | "Pending Format Verification"
   | "Editor In Chief Screening"
   | "Peer Review"
+  | "Revision Requested"
   | "Returned to Author"
   | "Rejected"
   | "Accepted"
@@ -44,6 +44,8 @@ export interface UserProfile {
   affiliation?: string;
   orcid_id?: string;
   role: AppRole;
+  /** Populated for reviewers; optional SESAM focus for invite ranking */
+  review_expertise?: string | null;
   created_at: string;
 }
 
@@ -74,6 +76,84 @@ export interface AutomatedCheckSnapshot {
   plagiarism: { status: string; message: string };
 }
 
+export type ReviewerRecommendation =
+  | "accept"
+  | "minor-revision"
+  | "major-revision"
+  | "reject";
+
+export type ReviewInvitationStatus = "invited" | "accepted" | "declined" | "expired";
+
+export interface ReviewInvitation {
+  id: string;
+  reviewerEmail: string;
+  reviewerName: string;
+  expertise: string;
+  invitedAt: string;
+  dueAt: string;
+  status: ReviewInvitationStatus;
+}
+
+export interface ReviewSubmission {
+  id: string;
+  invitationId: string;
+  reviewerEmail: string;
+  summary: string;
+  majorConcerns: string;
+  minorConcerns: string;
+  confidentialToEditor?: string;
+  recommendation: ReviewerRecommendation;
+  submittedAt: string;
+}
+
+export interface PeerReviewRound {
+  round: number;
+  createdAt: string;
+  targetReviewerCount: number;
+  invitations: ReviewInvitation[];
+  submissions: ReviewSubmission[];
+  editorDecision?: "accept" | "revise" | "reject" | "additional-reviewer";
+  editorDecisionNote?: string;
+  decidedAt?: string;
+}
+
+export interface RevisionVersion {
+  id: string;
+  round: number;
+  submittedAt: string;
+  authorNote: string;
+  responseLetter?: string;
+  fileUrl?: string;
+  extensionGranted?: boolean;
+  extensionReason?: string;
+}
+
+export interface NotificationEvent {
+  id: string;
+  type:
+    | "submission-received"
+    | "screening-decision"
+    | "review-invitation"
+    | "review-submitted"
+    | "revision-requested"
+    | "revision-submitted"
+    | "accepted"
+    | "published";
+  recipientRole: AppRole | "public";
+  recipientEmail?: string;
+  message: string;
+  createdAt: string;
+  delivered: boolean;
+}
+
+export interface WorkflowAuditLog {
+  id: string;
+  actor: string;
+  action: string;
+  note?: string;
+  createdAt: string;
+}
+
 export interface SubmissionMetadata {
   funding?: string;
   subjectArea?: string;
@@ -93,6 +173,27 @@ export interface SubmissionMetadata {
   screening_decided_at?: string;
   screening_decided_by?: string;
   editor_verification_comments?: string;
+  peer_review?: {
+    activeRound?: number;
+    rounds: PeerReviewRound[];
+  };
+  revision_cycle?: {
+    rounds: RevisionVersion[];
+    extensionPolicyDays?: number;
+  };
+  /** Relational `revision_extension_grants` merged for editors/authors (not author file uploads). */
+  revision_extension_grants?: Array<{
+    id: string;
+    reason: string;
+    grantedAt: string;
+  }>;
+  notifications?: NotificationEvent[];
+  audit_logs?: WorkflowAuditLog[];
+  ai_summary?: {
+    short?: string;
+    keywords?: string[];
+    generatedAt?: string;
+  };
 }
 
 export interface Manuscript {
@@ -110,6 +211,8 @@ export interface Manuscript {
   created_at: string;
   published_at?: string | null;
   reference_code?: string | null;
+  /** Active peer-review round; relational store mirrors former submission_metadata.peer_review.activeRound */
+  peer_review_active_round?: number | null;
   submission_metadata?: SubmissionMetadata | null;
   metrics?: ManuscriptMetrics | null;
 }
@@ -215,6 +318,10 @@ export function normalizeManuscriptRow(row: Record<string, unknown>): Manuscript
     created_at: String(row.created_at ?? new Date().toISOString()),
     published_at: (row.published_at as string) ?? null,
     reference_code: (row.reference_code as string) ?? null,
+    peer_review_active_round:
+      row.peer_review_active_round == null || row.peer_review_active_round === ""
+        ? null
+        : Number(row.peer_review_active_round),
     submission_metadata: parseSubmissionMetadata(row.submission_metadata),
     metrics,
   };

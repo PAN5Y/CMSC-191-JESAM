@@ -1,14 +1,10 @@
-import { useEffect } from "react";
-import { EditorInChiefScreening } from "../components/EditorInChiefScreening";
-import { useSubmissions } from "../hooks/useSubmissions";
-import { useAuth } from "@/contexts/AuthContext";
-import { Crown } from "lucide-react";
+import { useEffect } from 'react';
+import { EditorInChiefScreening } from '../components/EditorInChiefScreening';
+import { useSubmissions } from '../hooks/useSubmissions';
+import { useAuth } from '@/contexts/AuthContext';
+import { Crown } from 'lucide-react';
 
-const SCREENING_STATUSES = [
-  "In Submission Queue",
-  "Administrative Check",
-  "Editor In Chief Screening",
-] as const;
+const SCREENING_STATUSES = ['Editor In Chief Screening'] as const;
 
 export default function EditorInChiefDashboard() {
   const { user } = useAuth();
@@ -23,14 +19,13 @@ export default function EditorInChiefDashboard() {
     SCREENING_STATUSES.includes(m.status as (typeof SCREENING_STATUSES)[number])
   );
 
-  const decidedBy = user?.email ?? user?.id ?? "unknown";
+  const decidedBy = user?.email ?? user?.id ?? 'unknown';
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center gap-3">
-            <Crown className="w-8 h-8 text-amber-600" />
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Editor-in-Chief screening</h1>
               <p className="text-gray-600 mt-1">
@@ -42,7 +37,16 @@ export default function EditorInChiefDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div>
+              <p className="text-sm text-gray-600">Pending format verification</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
+                {manuscripts.filter((m) => m.status === 'Pending Format Verification').length}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Handling editor queue (monitoring)</p>
+            </div>
+          </div>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div>
               <p className="text-sm text-gray-600">For screening</p>
@@ -53,17 +57,9 @@ export default function EditorInChiefDashboard() {
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div>
-              <p className="text-sm text-gray-600">In submission queue</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
-                {manuscripts.filter((m) => m.status === "In Submission Queue").length}
-              </p>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div>
               <p className="text-sm text-gray-600">Peer review</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {manuscripts.filter((m) => m.status === "Peer Review").length}
+                {manuscripts.filter((m) => m.status === 'Peer Review').length}
               </p>
             </div>
           </div>
@@ -71,7 +67,7 @@ export default function EditorInChiefDashboard() {
             <div>
               <p className="text-sm text-gray-600">Published</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">
-                {manuscripts.filter((m) => m.status === "Published").length}
+                {manuscripts.filter((m) => m.status === 'Published').length}
               </p>
             </div>
           </div>
@@ -96,7 +92,7 @@ export default function EditorInChiefDashboard() {
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600">No manuscripts available for screening</p>
             <p className="text-sm text-gray-500 mt-2">
-              Newly submitted manuscripts appear here immediately, including those still in editor verification.
+              Manuscripts appear here after a handling editor clears format verification.
             </p>
           </div>
         ) : (

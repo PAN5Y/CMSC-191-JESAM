@@ -32,18 +32,24 @@ export function SubmissionSuccess({
     },
     {
       id: 2,
-      title: "Screening",
+      title: "Format verification",
       status: "pending" as const,
-      description: "Awaiting editor review",
+      description: "Handling editor confirms automated template and quality checks",
     },
     {
       id: 3,
+      title: "EIC screening",
+      status: "not-started" as const,
+      description: "Editor-in-Chief desk decision before external review",
+    },
+    {
+      id: 4,
       title: "Peer Review",
       status: "not-started" as const,
       description: "Not yet started",
     },
     {
-      id: 4,
+      id: 5,
       title: "Publication",
       status: "not-started" as const,
       description: "Not yet started",
@@ -95,7 +101,10 @@ export function SubmissionSuccess({
             <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <h4 className="text-sm font-semibold text-blue-900 mb-1">Current Status</h4>
-              <p className="text-sm text-blue-800">In submission queue — awaiting editor verification</p>
+              <p className="text-sm text-blue-800">
+                Pending format verification — a handling editor will verify checks, then the Editor-in-Chief will
+                screen your manuscript.
+              </p>
             </div>
           </div>
         </div>

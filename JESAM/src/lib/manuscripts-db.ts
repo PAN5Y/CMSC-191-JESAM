@@ -6,9 +6,20 @@ import type {
   JournalClassification,
 } from "@/types";
 import { normalizeManuscriptRow } from "@/types";
+import { mergePeerReviewIntoManuscripts } from "@/lib/peer-review-db";
+import { mergeRevisionIntoManuscripts } from "@/lib/revision-db";
 import type { AppRole } from "@/types";
 
 const BUCKET = "manuscript-files";
+
+/** Stable object name: `stem_version_N.ext` (proposal §2.5 traceability). */
+export function versionedStorageFileName(originalFileName: string, versionNumber: number): string {
+  const safe = originalFileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const lastDot = safe.lastIndexOf(".");
+  const suffix = `_version_${versionNumber}`;
+  if (lastDot <= 0) return `${safe}${suffix}`;
+  return `${safe.slice(0, lastDot)}${suffix}${safe.slice(lastDot)}`;
+}
 
 export function buildUniqueReferenceCode(): string {
   const year = new Date().getFullYear();
@@ -67,7 +78,43 @@ export async function listManuscriptsFromDb(
     return normalizeManuscriptRow(r);
   });
 
-  return { data: normalized, error: null };
+  const withPeer = await mergePeerReviewIntoManuscripts(normalized);
+  const withRevision = await mergeRevisionIntoManuscripts(withPeer);
+
+  return { data: withRevision, error: null };
+}
+
+/**
+ * Published manuscripts only, for anonymous public browse (no submitter filter).
+ * Requires Supabase RLS to allow anon SELECT on published rows if used logged-out.
+ */
+export async function listPublishedManuscriptsPublic(): Promise<{
+  data: Manuscript[];
+  error: Error | null;
+}> {
+  const { data, error } = await supabase
+    .from("manuscripts")
+    .select("*, metrics:article_metrics(*)")
+    .eq("status", "Published")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { data: [], error: new Error(error.message) };
+  }
+
+  const normalized = (data || []).map((row) => {
+    const r = row as Record<string, unknown>;
+    const m = r.metrics;
+    if (Array.isArray(m) && m[0]) {
+      r.metrics = m[0];
+    }
+    return normalizeManuscriptRow(r);
+  });
+
+  const withPeer = await mergePeerReviewIntoManuscripts(normalized);
+  const withRevision = await mergeRevisionIntoManuscripts(withPeer);
+
+  return { data: withRevision, error: null };
 }
 
 export interface CreateManuscriptInput {
@@ -155,14 +202,52 @@ export async function getManuscriptByIdFromDb(
     r.metrics = m[0];
   }
 
-  return { data: normalizeManuscriptRow(r), error: null };
+  const base = normalizeManuscriptRow(r);
+  const [withPeer] = await mergePeerReviewIntoManuscripts([base]);
+  const [merged] = await mergeRevisionIntoManuscripts([withPeer]);
+  return { data: merged, error: null };
 }
 
 export async function uploadManuscriptFileToStorage(
   manuscriptId: string,
   file: File
 ): Promise<{ publicUrl: string | null; error: Error | null }> {
-  const filePath = `manuscripts/${manuscriptId}/${file.name}`;
+  const filePath = `manuscripts/${manuscriptId}/${versionedStorageFileName(file.name, 1)}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(filePath, file, { upsert: true });
+
+  if (uploadError) {
+    return {
+      publicUrl: null,
+      error: new Error(
+        `Storage upload failed for bucket "${BUCKET}" at "${filePath}": ${uploadError.message}`
+      ),
+    };
+  }
+
+  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+  if (!urlData?.publicUrl) {
+    return {
+      publicUrl: null,
+      error: new Error(
+        `Upload succeeded but public URL could not be generated for "${BUCKET}/${filePath}"`
+      ),
+    };
+  }
+  return { publicUrl: urlData.publicUrl, error: null };
+}
+
+/** Revision uploads: isolated path per version (proposal §2.5 traceability). */
+export async function uploadRevisionFileToStorage(
+  manuscriptId: string,
+  revisionNumber: number,
+  file: File
+): Promise<{ publicUrl: string | null; error: Error | null }> {
+  /** Display/manuscript version: initial upload is v1; first DB revision row is v2, etc. */
+  const versionedName = versionedStorageFileName(file.name, revisionNumber + 1);
+  const filePath = `manuscripts/${manuscriptId}/revisions/v${revisionNumber}/${versionedName}`;
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)

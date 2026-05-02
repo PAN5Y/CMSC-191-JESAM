@@ -52,7 +52,7 @@ export function EditorVerificationTable({
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-1">Manuscripts awaiting verification</h3>
         <p className="text-sm text-gray-600">
-          Review automated checks and approve or return manuscripts to the author.
+          Manuscripts awaiting handling-editor verification before Editor-in-Chief screening.
         </p>
       </div>
 

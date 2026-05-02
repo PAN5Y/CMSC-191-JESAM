@@ -14,9 +14,10 @@ export function AdministrativeCheck() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold text-gray-900 mb-2">Administrative Check</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-2">Author Declarations</h2>
         <p className="text-gray-600">
-          Final declarations required before submission. Please review and confirm each statement carefully.
+          Final author confirmations required before submission to Editor-in-Chief screening.
+          Please review and confirm each statement carefully.
         </p>
       </div>
 

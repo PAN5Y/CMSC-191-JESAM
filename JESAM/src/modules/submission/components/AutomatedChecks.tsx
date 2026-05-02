@@ -1,10 +1,12 @@
 import { Upload, FileText, Image, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useSubmissionWizard } from '../context/SubmissionWizardContext';
+import type { AutomatedCheckResult } from '../types';
+import {
+  runAutomatedChecksSimulation,
+  SIMILARITY_THRESHOLD_PERCENT,
+} from '@/lib/automated-checks-runner';
 
 type CheckStatus = 'pending' | 'checking' | 'passed' | 'failed';
-
-/** JESAM stakeholder threshold: similarity must be at or below this percent to pass automated screening. */
-const SIMILARITY_THRESHOLD_PERCENT = 30;
 
 export function AutomatedChecks() {
   const { checks, setChecks, manuscriptFile, setManuscriptFile } = useSubmissionWizard();
@@ -23,53 +25,9 @@ export function AutomatedChecks() {
   };
 
   const runAutomatedChecks = async (file: File) => {
-    setChecks({
-      formatting: { status: 'checking', message: 'Verifying template adherence...' },
-      assets: { status: 'pending', message: '' },
-      plagiarism: { status: 'pending', message: '' },
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setChecks((prev) => ({
-      ...prev,
-      formatting: {
-        status: 'passed',
-        message: 'Template adherence verified. All formatting requirements met.',
-      },
-      assets: { status: 'checking', message: 'Validating figures and assets...' },
-      plagiarism: prev.plagiarism,
-    }));
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setChecks((prev) => ({
-      ...prev,
-      assets: {
-        status: 'passed',
-        message: 'All figures meet resolution requirements. Blinding status confirmed.',
-      },
-      plagiarism: { status: 'checking', message: 'Running similarity screening...' },
-    }));
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    const similarityIndex = Math.floor(Math.random() * 35) + 5;
-
-    if (similarityIndex <= SIMILARITY_THRESHOLD_PERCENT) {
-      setChecks((prev) => ({
-        ...prev,
-        plagiarism: {
-          status: 'passed',
-          message: `Similarity index: ${similarityIndex}%. Within acceptable threshold (${SIMILARITY_THRESHOLD_PERCENT}% or below).`,
-        },
-      }));
-    } else {
-      setChecks((prev) => ({
-        ...prev,
-        plagiarism: {
-          status: 'failed',
-          message: `Similarity index: ${similarityIndex}%. Exceeds ${SIMILARITY_THRESHOLD_PERCENT}% threshold. Please revise overlapping sections and resubmit.`,
-        },
-      }));
-    }
+    await runAutomatedChecksSimulation(file, (partial) =>
+      setChecks(partial as AutomatedCheckResult)
+    );
   };
 
   const getStatusIcon = (status: CheckStatus) => {

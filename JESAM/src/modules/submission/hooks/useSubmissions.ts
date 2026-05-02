@@ -14,6 +14,7 @@ import type {
   SubmissionMetadata,
 } from "@/types";
 import type { ScreeningDecision } from "../types";
+import { appendAudit, appendNotification } from "@/lib/workflow";
 
 export interface CreateManuscriptFromWizardInput {
   metadata: {
@@ -139,6 +140,27 @@ export function useSubmissions() {
           ...buildSubmissionMetadata(input),
           similarity_score:
             parseSimilarityFromMessage(input.checks.plagiarism.message),
+          notifications: [
+            {
+              id: `notif-${Date.now()}`,
+              type: "submission-received",
+              recipientRole: "author",
+              recipientEmail: user.email,
+              message:
+                "Submission received. A handling editor will verify formatting; then the Editor-in-Chief will screen the manuscript.",
+              createdAt: new Date().toISOString(),
+              delivered: true,
+            },
+          ],
+          audit_logs: [
+            {
+              id: `audit-${Date.now()}`,
+              actor: user.email ?? user.id,
+              action: "submission-created",
+              note: "Initial manuscript submission",
+              createdAt: new Date().toISOString(),
+            },
+          ],
         };
 
         const { data: created, error: insertErr } = await insertManuscript({
@@ -148,7 +170,7 @@ export function useSubmissions() {
           authors: authorStrings,
           keywords,
           classification,
-          status: "In Submission Queue",
+          status: "Pending Format Verification",
           submission_metadata,
         });
 
@@ -242,6 +264,17 @@ export function useSubmissions() {
         const submission_metadata = {
           ...prevMeta,
           ...metaPatch,
+          notifications: appendNotification(existing ?? ({} as Manuscript), {
+            type: "screening-decision",
+            recipientRole: "author",
+            message: `Screening decision applied: ${decision.decision}.`,
+          }),
+          audit_logs: appendAudit(
+            existing ?? ({} as Manuscript),
+            decision.decidedBy,
+            "screening-decision",
+            decision.decision
+          ),
         } as SubmissionMetadata;
 
         const { error: upErr } = await updateManuscriptRow(decision.id, {

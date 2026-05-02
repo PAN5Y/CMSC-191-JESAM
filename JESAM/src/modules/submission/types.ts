@@ -50,8 +50,8 @@ export interface SubmissionStep {
   component: ComponentType<unknown>;
 }
 
-// Editor Decision
-export type EditorDecision = "approve" | "reject" | "return-for-formatting";
+// EIC Decision (submission phase)
+export type EditorDecision = "approve" | "reject" | "return-to-author";
 
 /** EIC / screening decision; `id` is the manuscripts row UUID. */
 export interface ScreeningDecision {
