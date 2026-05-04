@@ -2,78 +2,63 @@ import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { depositDOI, generateDOIString } from "@/lib/crossref";
+import {
+  listManuscriptsFromDb,
+  updateManuscriptRow,
+  getManuscriptByIdFromDb,
+} from "@/lib/manuscripts-db";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Manuscript, ManuscriptStatus, ReadinessStatus } from "../types";
+import { appendAudit, appendNotification } from "@/lib/workflow";
 
-export function useManuscripts(filterStatus?: ManuscriptStatus) {
+export interface UseManuscriptsOptions {
+  filterStatus?: ManuscriptStatus;
+  /** When true, only load post-acceptance pipeline rows (publication dashboard). */
+  publicationOnly?: boolean;
+}
+
+export function useManuscripts(options?: UseManuscriptsOptions) {
+  const filterStatus = options?.filterStatus;
+  const publicationOnly = options?.publicationOnly ?? false;
   const { user, role } = useAuth();
   const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch manuscripts from Supabase with optional status filter
   const fetchManuscripts = useCallback(async () => {
-    // If auth state hasn't resolved yet, do nothing
     if (!user || !role) return;
 
     setLoading(true);
     setError(null);
 
-    let query = supabase
-      .from("manuscripts")
-      .select("*, metrics:article_metrics(*)")
-      .order("created_at", { ascending: false });
-
-    // ── RBAC Logic: Filter by submitter_id if user is an author ──
-    if (role === "author") {
-      query = query.eq("submitter_id", user.id);
-    }
-
-    if (filterStatus) {
-      query = query.eq("status", filterStatus);
-    }
-
-    const { data, error: fetchError } = await query;
+    const { data, error: fetchError } = await listManuscriptsFromDb({
+      userId: user.id,
+      role,
+      status: filterStatus,
+      publicationStatusesOnly: publicationOnly,
+    });
 
     if (fetchError) {
       setError(fetchError.message);
       toast.error(`Failed to fetch manuscripts: ${fetchError.message}`);
+      setManuscripts([]);
     } else {
-      // Supabase returns metrics as an array from the join; normalize to single object
-      const normalized = (data || []).map((m) => ({
-        ...m,
-        metrics: Array.isArray(m.metrics) ? m.metrics[0] || null : m.metrics,
-      })) as Manuscript[];
-      setManuscripts(normalized);
+      setManuscripts(data);
     }
 
     setLoading(false);
-  }, [filterStatus, user?.id, role]);
+  }, [filterStatus, publicationOnly, user?.id, role]);
 
   useEffect(() => {
     fetchManuscripts();
   }, [fetchManuscripts]);
 
-  // Get a single manuscript by ID
-  const getById = useCallback(
-    async (id: string): Promise<Manuscript | null> => {
-      const { data, error: fetchError } = await supabase
-        .from("manuscripts")
-        .select("*, metrics:article_metrics(*)")
-        .eq("id", id)
-        .single();
+  const getById = useCallback(async (id: string): Promise<Manuscript | null> => {
+    const { data, error: fetchError } = await getManuscriptByIdFromDb(id);
+    if (fetchError || !data) return null;
+    return data;
+  }, []);
 
-      if (fetchError || !data) return null;
-
-      return {
-        ...data,
-        metrics: Array.isArray(data.metrics) ? data.metrics[0] || null : data.metrics,
-      } as Manuscript;
-    },
-    []
-  );
-
-  // Compute readiness status from manuscript fields
   const getReadinessStatus = useCallback(
     (manuscript: Manuscript): ReadinessStatus => {
       const hasMetadata =
@@ -93,20 +78,20 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     []
   );
 
-  // Generic update helper
   const updateManuscript = useCallback(
     async (id: string, updates: Partial<Manuscript>): Promise<boolean> => {
-      const { error: updateError } = await supabase
-        .from("manuscripts")
-        .update(updates)
-        .eq("id", id);
+      const payload: Record<string, unknown> = { ...updates };
+      if (payload.submission_metadata && typeof payload.submission_metadata === "object") {
+        payload.submission_metadata = payload.submission_metadata as Record<string, unknown>;
+      }
+
+      const { error: updateError } = await updateManuscriptRow(id, payload);
 
       if (updateError) {
         toast.error(`Update failed: ${updateError.message}`);
         return false;
       }
 
-      // Optimistic local update
       setManuscripts((prev) =>
         prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
       );
@@ -115,7 +100,6 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     []
   );
 
-  // Save metadata (title, authors, abstract, keywords)
   const saveMetadata = useCallback(
     async (
       id: string,
@@ -128,7 +112,6 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     [updateManuscript]
   );
 
-  // Upload file to Supabase Storage and save file_url
   const uploadFile = useCallback(
     async (id: string, file: File): Promise<boolean> => {
       const filePath = `manuscripts/${id}/${file.name}`;
@@ -156,7 +139,6 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     [updateManuscript]
   );
 
-  // Assign DOI manually
   const assignDOI = useCallback(
     async (id: string, doi: string) => {
       const success = await updateManuscript(id, { doi });
@@ -166,14 +148,12 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     [updateManuscript]
   );
 
-  // Auto-generate DOI via Crossref
   const autoGenerateDOI = useCallback(
     async (
       id: string
     ): Promise<{ success: boolean; doi: string; error?: string }> => {
       const manuscript = manuscripts.find((m) => m.id === id);
       if (!manuscript) {
-        // Fetch fresh if not in local state
         const fresh = await getById(id);
         if (!fresh) return { success: false, doi: "", error: "Manuscript not found" };
 
@@ -188,7 +168,6 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
       if (result.success) {
         await updateManuscript(id, { doi: result.doi });
       } else {
-        // Still provide a generated DOI string for manual entry
         const fallbackDOI = generateDOIString(manuscript);
         return { ...result, doi: fallbackDOI };
       }
@@ -197,7 +176,6 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     [manuscripts, getById, updateManuscript]
   );
 
-  // Publish manuscript — triggers status + published_at + initial metrics
   const publishManuscript = useCallback(
     async (id: string): Promise<boolean> => {
       const manuscript = manuscripts.find((m) => m.id === id);
@@ -214,12 +192,20 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
       const updates: Partial<Manuscript> = {
         status: "Published",
         published_at: new Date().toISOString(),
+        submission_metadata: {
+          ...(manuscript.submission_metadata ?? {}),
+          notifications: appendNotification(manuscript, {
+            type: "published",
+            recipientRole: "public",
+            message: `${manuscript.reference_code ?? manuscript.id} is now published.`,
+          }),
+          audit_logs: appendAudit(manuscript, "production_editor", "published"),
+        },
       };
 
       const success = await updateManuscript(id, updates);
       if (!success) return false;
 
-      // Create initial metrics row
       const { error: metricsError } = await supabase
         .from("article_metrics")
         .insert([
@@ -230,29 +216,50 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
         console.error("Failed to create metrics row:", metricsError);
       }
 
-      toast.success("🎉 Article successfully published!");
+      toast.success("Article successfully published!");
       return true;
     },
     [manuscripts, getReadinessStatus, updateManuscript]
   );
 
-  // Return to Revision
   const returnToRevision = useCallback(
     async (id: string) => {
+      const manuscript = manuscripts.find((m) => m.id === id);
+      const reference = manuscript?.reference_code ?? manuscript?.id ?? id;
       const success = await updateManuscript(id, {
-        status: "Return to Revision" as ManuscriptStatus,
+        status: "Revision Requested" as ManuscriptStatus,
+        submission_metadata: {
+          ...(manuscript?.submission_metadata ?? {}),
+          notifications: appendNotification(manuscript ?? ({} as Manuscript), {
+            type: "revision-requested",
+            recipientRole: "author",
+            message: `${reference} was returned by production for revision.`,
+          }),
+          audit_logs: appendAudit(
+            manuscript ?? ({} as Manuscript),
+            "production_editor",
+            "returned-to-revision"
+          ),
+        },
       });
-      if (success) toast.success("Manuscript returned to revision");
+      if (success) toast.success("Manuscript returned to author for revision");
       return success;
     },
-    [updateManuscript]
+    [manuscripts, updateManuscript]
   );
 
-  // Mark as Retracted
   const retractManuscript = useCallback(
     async (id: string) => {
       const success = await updateManuscript(id, {
         status: "Retracted" as ManuscriptStatus,
+        submission_metadata: {
+          ...(manuscripts.find((m) => m.id === id)?.submission_metadata ?? {}),
+          audit_logs: appendAudit(
+            manuscripts.find((m) => m.id === id) ?? ({} as Manuscript),
+            "production_editor",
+            "retracted"
+          ),
+        },
       });
       if (success) toast.error("Article has been retracted");
       return success;
@@ -260,7 +267,6 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     [updateManuscript]
   );
 
-  // Assign issue
   const assignIssue = useCallback(
     async (id: string, issueAssignment: string) => {
       const success = await updateManuscript(id, {
@@ -272,9 +278,7 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     [updateManuscript]
   );
 
-  // Increment download counter
   const incrementDownload = useCallback(async (manuscriptId: string) => {
-    // Use a direct update to increment
     const { data: current } = await supabase
       .from("article_metrics")
       .select("downloads")
@@ -289,24 +293,20 @@ export function useManuscripts(filterStatus?: ManuscriptStatus) {
     }
   }, []);
 
-  // Refresh metrics from DB
-  const refreshMetrics = useCallback(
-    async (id: string) => {
-      const { data } = await supabase
-        .from("article_metrics")
-        .select("*")
-        .eq("manuscript_id", id)
-        .single();
+  const refreshMetrics = useCallback(async (id: string) => {
+    const { data } = await supabase
+      .from("article_metrics")
+      .select("*")
+      .eq("manuscript_id", id)
+      .single();
 
-      if (data) {
-        setManuscripts((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, metrics: data } : m))
-        );
-        toast.success("Metrics refreshed");
-      }
-    },
-    []
-  );
+    if (data) {
+      setManuscripts((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, metrics: data } : m))
+      );
+      toast.success("Metrics refreshed");
+    }
+  }, []);
 
   return {
     manuscripts,

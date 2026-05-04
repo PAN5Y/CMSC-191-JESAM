@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
+import { getWorkspaceHomePath } from "@/lib/workspace-routing";
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -20,8 +21,14 @@ export default function LoginPage() {
 
     if (result.error) {
       setError(result.error);
+      return;
+    }
+
+    const r = result.role;
+    if (r) {
+      navigate(getWorkspaceHomePath(r), { replace: true });
     } else {
-      navigate("/publication/dashboard");
+      navigate("/author", { replace: true });
     }
   };
 

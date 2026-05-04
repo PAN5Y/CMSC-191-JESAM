@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router";
-import { useAuth, EDITOR_ROLES } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { getWorkspaceHomePath } from "@/lib/workspace-routing";
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -23,11 +24,10 @@ export default function LoginPage() {
       return;
     }
 
-    // ── Smart redirect based on resolved role ──
-    if (result.role && EDITOR_ROLES.includes(result.role)) {
-      navigate("/publication/dashboard", { replace: true });
+    const r = result.role;
+    if (r) {
+      navigate(getWorkspaceHomePath(r), { replace: true });
     } else {
-      // Default to author portal
       navigate("/author", { replace: true });
     }
   };

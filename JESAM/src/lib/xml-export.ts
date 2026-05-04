@@ -1,4 +1,4 @@
-import type { Manuscript } from "@/modules/publication-impact/types";
+import type { Manuscript } from "@/types";
 
 /**
  * Generate a downloadable XML file with manuscript metadata
@@ -26,7 +26,7 @@ export function generateMetadataXML(manuscript: Manuscript): string {
     <publisher>University of the Philippines Los Baños</publisher>
     <publication-date>${manuscript.published_at || new Date().toISOString()}</publication-date>
     <issue-assignment>${esc(manuscript.issue_assignment || "Online-First")}</issue-assignment>
-    <classification>${esc(manuscript.classification)}</classification>
+    <classification>${esc(manuscript.classification ?? "Unspecified")}</classification>
   </metadata>
   <authors>
 ${authorsXml}

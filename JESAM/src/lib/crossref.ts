@@ -1,4 +1,4 @@
-import type { Manuscript } from "@/modules/publication-impact/types";
+import type { Manuscript } from "@/types";
 
 /**
  * Generate a deterministic DOI string for a JESAM manuscript.

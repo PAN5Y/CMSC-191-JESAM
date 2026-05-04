@@ -8,6 +8,8 @@ import {
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { syncReviewExpertiseFromAuthMetadata } from "@/lib/profile-sync";
+import type { JournalClassification } from "@/types";
 import type { AppRole } from "@/modules/publication-impact/types";
 
 // Re-export so consumers can import from either location
@@ -33,6 +35,8 @@ export interface SignUpData {
   affiliation?: string;
   orcid_id?: string;
   role?: AppRole;
+  /** SESAM focus for peer-review invite ranking; required on form when role is reviewer */
+  review_expertise?: JournalClassification;
 }
 
 interface AuthContextValue {
@@ -70,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hydrateUser = useCallback(async (currentUser: User | null) => {
     setUser(currentUser);
     if (currentUser) {
+      await syncReviewExpertiseFromAuthMetadata(currentUser);
       const fetchedRole = await fetchRoleFromProfiles(currentUser.id);
       setRole(fetchedRole);
     } else {
@@ -125,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Register a new user with email + password.
    * All fields are passed via options.data (raw_user_meta_data) so the DB
    * trigger `on_auth_user_created` can extract them into the profiles row.
+   * Ensure your Supabase profile trigger copies `review_expertise` into `profiles.review_expertise`
+   * when present (see README Supabase section).
    */
   const signUp = useCallback(
     async (formData: SignUpData): Promise<{ error?: string }> => {
@@ -139,13 +146,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (formData.affiliation) metadata.affiliation = formData.affiliation;
       if (formData.orcid_id) metadata.orcid_id = formData.orcid_id;
       if (formData.role) metadata.role = formData.role;
+      if (formData.role === "reviewer" && formData.review_expertise) {
+        metadata.review_expertise = formData.review_expertise;
+      }
 
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: { data: metadata },
       });
       if (error) return { error: error.message };
+      // Profile trigger may omit review_expertise; sync when session/user returned immediately.
+      if (data.user) {
+        await syncReviewExpertiseFromAuthMetadata(data.user);
+      }
       return {};
     },
     []

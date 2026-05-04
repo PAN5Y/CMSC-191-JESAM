@@ -9,8 +9,8 @@ export default function SubmissionDashboard() {
   const { manuscripts, loading, error, fetchManuscripts } = useSubmissions();
 
   useEffect(() => {
-    fetchManuscripts();
-  }, []);
+    void fetchManuscripts();
+  }, [fetchManuscripts]);
 
   const handleNewSubmission = () => {
     navigate('/author/submit');
@@ -25,16 +25,18 @@ export default function SubmissionDashboard() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">My Submissions</h1>
               <p className="text-gray-600 mt-1">
-                Track the status of your manuscript submissions
+                Track your manuscripts from submission through format verification, EIC screening,
+                and peer review
               </p>
             </div>
-            {/* <button
+            <button
+              type="button"
               onClick={handleNewSubmission}
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-5 h-5" />
               New Submission
-            </button> */}
+            </button>
           </div>
         </div>
       </div>
@@ -57,16 +59,9 @@ export default function SubmissionDashboard() {
         ) : manuscripts.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <p className="text-gray-600 mb-4">You haven't submitted any manuscripts yet</p>
-            <button
-              onClick={handleNewSubmission}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Start Your First Submission
-            </button>
           </div>
         ) : (
-          <SubmissionsTable onNewSubmission={handleNewSubmission} />
+          <SubmissionsTable manuscripts={manuscripts} onNewSubmission={handleNewSubmission} />
         )}
       </div>
     </div>

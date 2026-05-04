@@ -1,56 +1,42 @@
-import { useState } from 'react';
-import { Plus, X, User, Mail, Building2 } from 'lucide-react';
-
-interface Author {
-  id: string;
-  name: string;
-  email: string;
-  orcid: string;
-  affiliation: string;
-  isCorresponding: boolean;
-}
+import { Plus, X, User, Mail, Building2 } from "lucide-react";
+import type { Author } from "../types";
+import { useSubmissionWizard } from "../context/SubmissionWizardContext";
 
 export function AuthorInformation() {
-  const [authors, setAuthors] = useState<Author[]>([
-    {
-      id: '1',
-      name: '',
-      email: '',
-      orcid: '',
-      affiliation: '',
-      isCorresponding: true,
-    },
-  ]);
+  const { authors, setAuthors } = useSubmissionWizard();
 
   const addAuthor = () => {
     const newAuthor: Author = {
       id: Date.now().toString(),
-      name: '',
-      email: '',
-      orcid: '',
-      affiliation: '',
+      name: "",
+      email: "",
+      orcid: "",
+      affiliation: "",
       isCorresponding: false,
     };
-    setAuthors([...authors, newAuthor]);
+    setAuthors((prev) => [...prev, newAuthor]);
   };
 
   const removeAuthor = (id: string) => {
-    if (authors.length > 1) {
-      setAuthors(authors.filter(author => author.id !== id));
-    }
+    setAuthors((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((author) => author.id !== id);
+      if (!next.some((a) => a.isCorresponding) && next[0]) {
+        next[0] = { ...next[0], isCorresponding: true };
+      }
+      return next;
+    });
   };
 
   const updateAuthor = (id: string, field: keyof Author, value: string | boolean) => {
-    setAuthors(
-      authors.map(author =>
-        author.id === id ? { ...author, [field]: value } : author
-      )
+    setAuthors((prev) =>
+      prev.map((author) => (author.id === id ? { ...author, [field]: value } : author))
     );
   };
 
   const setCorrespondingAuthor = (id: string) => {
-    setAuthors(
-      authors.map(author => ({
+    setAuthors((prev) =>
+      prev.map((author) => ({
         ...author,
         isCorresponding: author.id === id,
       }))
@@ -66,14 +52,12 @@ export function AuthorInformation() {
         </p>
       </div>
 
-      {/* Authors List */}
       <div className="space-y-6">
         {authors.map((author, index) => (
           <div
             key={author.id}
             className="p-6 border-2 border-gray-200 rounded-lg bg-gray-50 relative"
           >
-            {/* Author Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
@@ -81,13 +65,14 @@ export function AuthorInformation() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">
-                    {author.isCorresponding ? 'Corresponding Author' : `Co-Author ${index}`}
+                    {author.isCorresponding ? "Corresponding Author" : `Co-Author ${index}`}
                   </h3>
                   <p className="text-sm text-gray-500">Author #{index + 1}</p>
                 </div>
               </div>
               {authors.length > 1 && (
                 <button
+                  type="button"
                   onClick={() => removeAuthor(author.id)}
                   className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
@@ -96,9 +81,7 @@ export function AuthorInformation() {
               )}
             </div>
 
-            {/* Author Fields */}
             <div className="space-y-4">
-              {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Full Name <span className="text-red-500">*</span>
@@ -106,13 +89,12 @@ export function AuthorInformation() {
                 <input
                   type="text"
                   value={author.name}
-                  onChange={(e) => updateAuthor(author.id, 'name', e.target.value)}
+                  onChange={(e) => updateAuthor(author.id, "name", e.target.value)}
                   placeholder="e.g., Dr. Jane Smith"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white transition-shadow"
                 />
               </div>
 
-              {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address <span className="text-red-500">*</span>
@@ -122,14 +104,13 @@ export function AuthorInformation() {
                   <input
                     type="email"
                     value={author.email}
-                    onChange={(e) => updateAuthor(author.id, 'email', e.target.value)}
+                    onChange={(e) => updateAuthor(author.id, "email", e.target.value)}
                     placeholder="jane.smith@university.edu"
                     className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white transition-shadow"
                   />
                 </div>
               </div>
 
-              {/* ORCID */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   ORCID iD <span className="text-red-500">*</span>
@@ -137,12 +118,12 @@ export function AuthorInformation() {
                 <input
                   type="text"
                   value={author.orcid}
-                  onChange={(e) => updateAuthor(author.id, 'orcid', e.target.value)}
+                  onChange={(e) => updateAuthor(author.id, "orcid", e.target.value)}
                   placeholder="0000-0000-0000-0000"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white transition-shadow"
                 />
                 <p className="mt-1 text-sm text-gray-500">
-                  Don't have an ORCID?{' '}
+                  Don&apos;t have an ORCID?{" "}
                   <a
                     href="https://orcid.org/register"
                     target="_blank"
@@ -154,7 +135,6 @@ export function AuthorInformation() {
                 </p>
               </div>
 
-              {/* Affiliation */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Affiliation <span className="text-red-500">*</span>
@@ -164,17 +144,17 @@ export function AuthorInformation() {
                   <input
                     type="text"
                     value={author.affiliation}
-                    onChange={(e) => updateAuthor(author.id, 'affiliation', e.target.value)}
+                    onChange={(e) => updateAuthor(author.id, "affiliation", e.target.value)}
                     placeholder="Department, Institution, City, Country"
                     className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white transition-shadow"
                   />
                 </div>
               </div>
 
-              {/* Corresponding Author Toggle */}
               {!author.isCorresponding && (
                 <div className="pt-2">
                   <button
+                    type="button"
                     onClick={() => setCorrespondingAuthor(author.id)}
                     className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
                   >
@@ -187,8 +167,8 @@ export function AuthorInformation() {
         ))}
       </div>
 
-      {/* Add Author Button */}
       <button
+        type="button"
         onClick={addAuthor}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-colors font-medium"
       >
@@ -196,7 +176,6 @@ export function AuthorInformation() {
         Add Co-Author
       </button>
 
-      {/* Information Box */}
       <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
         <h4 className="font-medium text-amber-900 mb-2">Important Notes:</h4>
         <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">

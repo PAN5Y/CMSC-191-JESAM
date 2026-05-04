@@ -14,7 +14,9 @@ const statusTabs: { label: string; value: ManuscriptStatus | "all" }[] = [
 
 export default function PublicationDashboard() {
   const { role } = useAuth();
-  const { manuscripts, loading, error, fetchManuscripts } = useManuscripts();
+  const { manuscripts, loading, error, fetchManuscripts } = useManuscripts({
+    publicationOnly: true,
+  });
   const [activeTab, setActiveTab] = useState<ManuscriptStatus | "all">("all");
 
   const isAuthor = role === "author";

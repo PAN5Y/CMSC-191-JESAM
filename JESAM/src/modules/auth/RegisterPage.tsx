@@ -2,6 +2,9 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth, type SignUpData } from "@/contexts/AuthContext";
 import type { AppRole } from "@/modules/publication-impact/types";
+import type { JournalClassification } from "@/types";
+
+const SESAM_FOCUS_OPTIONS: JournalClassification[] = ["Land", "Air", "Water", "People"];
 
 const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "author", label: "Author" },
@@ -26,6 +29,7 @@ export default function RegisterPage() {
   const [affiliation, setAffiliation] = useState("");
   const [orcidId, setOrcidId] = useState("");
   const [role, setRole] = useState<AppRole>("author");
+  const [reviewExpertise, setReviewExpertise] = useState<JournalClassification | "">("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -45,6 +49,10 @@ export default function RegisterPage() {
       setError("Password must be at least 6 characters.");
       return;
     }
+    if (role === "reviewer" && !reviewExpertise) {
+      setError("Please select your SESAM review expertise (focus area).");
+      return;
+    }
 
     setIsLoading(true);
     const payload: SignUpData = {
@@ -57,6 +65,7 @@ export default function RegisterPage() {
       affiliation: affiliation || undefined,
       orcid_id: orcidId || undefined,
       role,
+      review_expertise: role === "reviewer" && reviewExpertise ? reviewExpertise : undefined,
     };
 
     const result = await signUp(payload);
@@ -250,7 +259,11 @@ export default function RegisterPage() {
               <select
                 id="register-role"
                 value={role}
-                onChange={(e) => setRole(e.target.value as AppRole)}
+                onChange={(e) => {
+                  const v = e.target.value as AppRole;
+                  setRole(v);
+                  if (v !== "reviewer") setReviewExpertise("");
+                }}
                 className={inputClasses}
               >
                 {ROLE_OPTIONS.map((opt) => (
@@ -260,6 +273,33 @@ export default function RegisterPage() {
                 ))}
               </select>
             </div>
+
+            {role === "reviewer" && (
+              <div>
+                <label className={labelClasses}>
+                  SESAM review expertise <span className="text-[#c62828]">*</span>
+                </label>
+                <p className="text-[10px] text-[#9e9e9e] font-['Public_Sans',sans-serif] mb-2">
+                  Primary focus for editorial invite suggestions (Land / Air / Water / People).
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {SESAM_FOCUS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setReviewExpertise(opt)}
+                      className={`px-4 py-3 border-2 rounded-lg font-medium font-['Public_Sans',sans-serif] text-sm transition-all ${
+                        reviewExpertise === opt
+                          ? "border-[#3f4b7e] bg-[#3f4b7e]/10 text-[#3f4b7e]"
+                          : "border-[#e0e0e0] bg-[#f8f8fa] text-[#1a1c1c] hover:border-[#b0b0b0]"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ── Password Row ── */}
             <div className="grid grid-cols-2 gap-4">
