@@ -181,6 +181,100 @@ export default function PeerReviewDashboard() {
   const [postRevisionRoundSubmitting, setPostRevisionRoundSubmitting] = useState(false);
 
   useEffect(() => {
+    if (manuscripts.length === 0 || !poolReady) return;
+
+    let cancelled = false;
+    const runAutomations = async () => {
+      let remindersSent = 0;
+      let replacementsAssigned = 0;
+
+      for (const m of manuscripts) {
+        if (cancelled) break;
+        const ar = m.peer_review_active_round ?? m.submission_metadata?.peer_review?.activeRound ?? 1;
+        const roundData = m.submission_metadata?.peer_review?.rounds.find((r) => r.round === ar);
+        if (!roundData) continue;
+
+        const auditLogs = m.submission_metadata?.audit_logs ?? [];
+        const existingInvitations = roundData.invitations ?? [];
+        const submissions = roundData.submissions ?? [];
+
+        for (const inv of existingInvitations) {
+          const hasSubmitted = submissions.some(s => s.reviewerEmail === inv.reviewerEmail);
+          const dueTime = new Date(inv.dueAt).getTime();
+          const now = Date.now();
+
+          // A reviewer is considered "failed" if they declined, explicitly expired, OR missed the deadline without submitting.
+          const deadlinePassed = !hasSubmitted && now > dueTime;
+          const isFailed = inv.status === "declined" || inv.status === "expired" || deadlinePassed;
+
+          // 1. Auto-Assign Replacement for Failed Reviewers
+          if (isFailed) {
+            // Check if we already automatically handled this specific failure
+            const replacementAlreadyAssigned = auditLogs.some(
+              (log) => log.action === 'auto-replacement-assigned' && log.note === inv.id
+            );
+
+            // Count how many active invites remain
+            const activeInvites = existingInvitations.filter(i => {
+              const iHasSubmitted = submissions.some(s => s.reviewerEmail === i.reviewerEmail);
+              const iPassed = !iHasSubmitted && now > new Date(i.dueAt).getTime();
+              return i.status !== 'declined' && i.status !== 'expired' && !iPassed;
+            });
+            const targetCount = roundData.targetReviewerCount ?? PEER_REVIEW_TARGET_COUNT;
+
+            if (!replacementAlreadyAssigned && activeInvites.length < targetCount && !cancelled) {
+              const nextReviewer = pickNextSuggestedReviewer(m, existingInvitations, reviewerPool);
+              if (nextReviewer) {
+                const added = await addInvitation(m, nextReviewer);
+                if (added) {
+                  replacementsAssigned++;
+                  // Manually push a local audit log so we don't spam in the same loop
+                  auditLogs.push({
+                    id: "temp-" + Date.now(),
+                    createdAt: new Date().toISOString(),
+                    actor: "system",
+                    action: "auto-replacement-assigned",
+                    note: inv.id
+                  });
+                }
+              }
+            }
+          }
+          // 2. Automated Reminders for Active Reviewers
+          else if (!hasSubmitted) {
+            // We send the reminder if they are within 2 days of the deadline
+            const reminderThreshold = dueTime - (2 * 24 * 60 * 60 * 1000);
+
+            if (now > reminderThreshold) {
+              const reminderAlreadySent = auditLogs.some(
+                (log) => log.action === 'review-reminder-sent' && log.note === inv.reviewerEmail
+              );
+
+              if (!reminderAlreadySent && !cancelled) {
+                await sendReviewReminder(m, inv.id);
+                remindersSent++;
+              }
+            }
+          }
+        }
+      }
+
+      if (remindersSent > 0 && !cancelled) {
+        toast.success(`Automated Reminders: Dispatched ${remindersSent} overdue reminder(s).`);
+      }
+      if (replacementsAssigned > 0 && !cancelled) {
+        toast.success(`Auto-Assign: Sent ${replacementsAssigned} replacement invitation(s).`);
+      }
+    };
+
+    void runAutomations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [manuscripts, sendReviewReminder, poolReady, reviewerPool, addInvitation]);
+
+  useEffect(() => {
     let cancelled = false;
     void (async () => {
       const { data, error } = await listReviewerCandidatesFromDb();
@@ -375,11 +469,10 @@ export default function PeerReviewDashboard() {
                   key={m.id}
                   type="button"
                   onClick={() => setSelectedId(m.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
-                    (selected?.id ?? manuscripts[0]?.id) === m.id
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${(selected?.id ?? manuscripts[0]?.id) === m.id
                       ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200"
                       : "border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium text-gray-900">
@@ -553,233 +646,236 @@ export default function PeerReviewDashboard() {
                   </p>
                 ) : null}
 
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/80 shadow-sm p-4">
-                <h3 className="text-sm font-semibold text-indigo-950 mb-2">
-                  AI-assisted reviewer suggestions (expertise match)
-                </h3>
-                <p className="text-xs text-indigo-900/80 mb-3">
-                  Proposal-aligned ranking by manuscript focus (Land/Air/Water/People). Editors confirm
-                  each invite.{" "}
-                  {reviewerSource === "database" ? (
-                    <span className="font-medium">Directory: registered reviewers (profiles).</span>
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/80 shadow-sm p-4">
+                  <h3 className="text-sm font-semibold text-indigo-950 mb-2">
+                    AI-assisted reviewer suggestions (expertise match)
+                  </h3>
+                  <p className="text-xs text-indigo-900/80 mb-3">
+                    Proposal-aligned ranking by manuscript focus (Land/Air/Water/People). Editors confirm
+                    each invite.{" "}
+                    {reviewerSource === "database" ? (
+                      <span className="font-medium">Directory: registered reviewers (profiles).</span>
+                    ) : (
+                      <span className="font-medium">Directory: demo fallback (no DB reviewers or RLS blocked).</span>
+                    )}
+                  </p>
+                  <div className="space-y-2">
+                    {!poolReady && (
+                      <p className="text-xs text-gray-600">Loading reviewer directory…</p>
+                    )}
+                    {poolReady &&
+                      rankedSuggestions.map((r) => (
+                        <div
+                          key={r.reviewerEmail}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded border border-indigo-100 bg-white px-3 py-2 text-sm"
+                        >
+                          <div>
+                            <span className="font-medium text-gray-900">{r.reviewerName}</span>
+                            <span className="text-gray-600"> · {r.expertise}</span>
+                            <span className="ml-2 text-xs text-indigo-600">match {r.matchScore}%</span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!selected}
+                            onClick={() => void handleInviteSuggested(selected, r)}
+                            className="text-xs px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            Invite
+                          </button>
+                        </div>
+                      ))}
+                    {poolReady && rankedSuggestions.length === 0 && (
+                      <p className="text-xs text-gray-600">All directory reviewers already invited.</p>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!poolReady || !selected}
+                      onClick={() => void handleInviteNext(selected)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[2.5rem]"
+                    >
+                      Invite top suggested reviewer
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50/80 shadow-sm p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Invitation responses</h3>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Tracks whether each invited reviewer has responded to the invitation (not the same as
+                    publication recommendations below).
+                  </p>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <span className="text-gray-700">
+                      <span className="font-semibold text-gray-900">{roundData?.invitations.length ?? 0}</span>{" "}
+                      invitation{(roundData?.invitations.length ?? 0) === 1 ? "" : "s"} sent
+                    </span>
+                    <span className="text-gray-400" aria-hidden>
+                      ·
+                    </span>
+                    <span className="text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">
+                      Pending: {invitationCounts.invited}
+                    </span>
+                    <span className="text-green-800 bg-green-50 border border-green-100 rounded px-2 py-0.5">
+                      Accepted: {invitationCounts.accepted}
+                    </span>
+                    <span className="text-gray-800 bg-white border border-gray-200 rounded px-2 py-0.5">
+                      Declined: {invitationCounts.declined}
+                    </span>
+                    {invitationCounts.expired > 0 ? (
+                      <span className="text-gray-700 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
+                        Expired: {invitationCounts.expired}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-white shadow-sm p-4">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Reviewer recommendations (this round, submitted only)
+                  </h3>
+                  <p className="text-xs text-gray-600 mt-1 mb-3">
+                    Counts reflect completed reviews in <strong>Round {activeRound}</strong> only. They update
+                    after each full submission—not when a reviewer accepts an invitation.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {recommendationTileOrder.map((key) => (
+                      <div key={key} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50 shadow-sm">
+                        <p className="text-xs text-gray-600 leading-tight">{recommendationShortLabel(key)}</p>
+                        <p className="text-xl font-semibold text-gray-900 mt-1">{recommendationCounts[key]}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/40 shadow-sm p-4">
+                  <h3 className="font-semibold text-gray-900">Submitted reviews (this round)</h3>
+                  {roundData ? (
+                    <RoundSubmittedReviewsList round={roundData} />
                   ) : (
-                    <span className="font-medium">Directory: demo fallback (no DB reviewers or RLS blocked).</span>
+                    <p className="text-sm text-gray-500">No round data for this manuscript yet.</p>
                   )}
-                </p>
-                <div className="space-y-2">
-                  {!poolReady && (
-                    <p className="text-xs text-gray-600">Loading reviewer directory…</p>
-                  )}
-                  {poolReady &&
-                    rankedSuggestions.map((r) => (
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-gray-100 shadow-sm p-4">
+                  <h3 className="font-semibold text-gray-900">Invitations and deadlines</h3>
+                  {(roundData?.invitations ?? []).map((inv) => {
+                    const overdue =
+                      inv.status !== "declined" && new Date(inv.dueAt).getTime() < Date.now();
+                    return (
                       <div
-                        key={r.reviewerEmail}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded border border-indigo-100 bg-white px-3 py-2 text-sm"
+                        key={inv.id}
+                        className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-2 flex-wrap bg-white shadow-sm"
                       >
                         <div>
-                          <span className="font-medium text-gray-900">{r.reviewerName}</span>
-                          <span className="text-gray-600"> · {r.expertise}</span>
-                          <span className="ml-2 text-xs text-indigo-600">match {r.matchScore}%</span>
+                          <p className="text-sm text-gray-900">
+                            {inv.reviewerName} ({inv.reviewerEmail})
+                          </p>
+                          <p className={`text-xs ${overdue ? "text-red-700" : "text-gray-600"}`}>
+                            Due: {new Date(inv.dueAt).toLocaleDateString()} • Status: {inv.status}
+                          </p>
                         </div>
                         <button
                           type="button"
-                          disabled={!selected}
-                          onClick={() => void handleInviteSuggested(selected, r)}
-                          className="text-xs px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          onClick={async () => {
+                            const ok = await sendReviewReminder(selected, inv.id);
+                            if (ok) toast.success("Reminder sent successfully!");
+                          }}
+                          className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 shrink-0 cursor-pointer"
                         >
-                          Invite
+                          Send reminder
                         </button>
                       </div>
-                    ))}
-                  {poolReady && rankedSuggestions.length === 0 && (
-                    <p className="text-xs text-gray-600">All directory reviewers already invited.</p>
+                    );
+                  })}
+                  {(roundData?.invitations.length ?? 0) === 0 && (
+                    <p className="text-sm text-gray-500">No invitations yet.</p>
                   )}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={!poolReady || !selected}
-                    onClick={() => void handleInviteNext(selected)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[2.5rem]"
-                  >
-                    Invite top suggested reviewer
-                  </button>
-                </div>
-              </div>
 
-              <div className="rounded-xl border border-gray-200 bg-gray-50/80 shadow-sm p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">Invitation responses</h3>
-                <p className="text-xs text-gray-600 mb-3">
-                  Tracks whether each invited reviewer has responded to the invitation (not the same as
-                  publication recommendations below).
-                </p>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <span className="text-gray-700">
-                    <span className="font-semibold text-gray-900">{roundData?.invitations.length ?? 0}</span>{" "}
-                    invitation{(roundData?.invitations.length ?? 0) === 1 ? "" : "s"} sent
-                  </span>
-                  <span className="text-gray-400" aria-hidden>
-                    ·
-                  </span>
-                  <span className="text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-0.5">
-                    Pending: {invitationCounts.invited}
-                  </span>
-                  <span className="text-green-800 bg-green-50 border border-green-100 rounded px-2 py-0.5">
-                    Accepted: {invitationCounts.accepted}
-                  </span>
-                  <span className="text-gray-800 bg-white border border-gray-200 rounded px-2 py-0.5">
-                    Declined: {invitationCounts.declined}
-                  </span>
-                  {invitationCounts.expired > 0 ? (
-                    <span className="text-gray-700 bg-gray-100 border border-gray-200 rounded px-2 py-0.5">
-                      Expired: {invitationCounts.expired}
-                    </span>
+                <div className="space-y-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+                  <h3 className="font-semibold text-gray-900">Editorial decision</h3>
+                  <p className="text-xs text-gray-600">
+                    One decision is recorded per round for audit. After it is saved, the manuscript status
+                    updates and this round&apos;s decision cannot be edited here—use the next workflow stage
+                    or a new review round if applicable.
+                  </p>
+                  {acceptRejectConflict && !roundDecisionLocked ? (
+                    <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                      Reviewers disagree on <strong>accept</strong> vs <strong>reject</strong>. You may still
+                      record a decision, or choose <strong>Request additional reviewer</strong> to open a new
+                      round (another {reviewsRequiredForDecision} reviews required for that round).
+                    </p>
                   ) : null}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-white shadow-sm p-4">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Reviewer recommendations (this round, submitted only)
-                </h3>
-                <p className="text-xs text-gray-600 mt-1 mb-3">
-                  Counts reflect completed reviews in <strong>Round {activeRound}</strong> only. They update
-                  after each full submission—not when a reviewer accepts an invitation.
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {recommendationTileOrder.map((key) => (
-                    <div key={key} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50 shadow-sm">
-                      <p className="text-xs text-gray-600 leading-tight">{recommendationShortLabel(key)}</p>
-                      <p className="text-xl font-semibold text-gray-900 mt-1">{recommendationCounts[key]}</p>
+                  {roundDecisionLocked && roundData?.editorDecision ? (
+                    <div className="rounded-lg border border-green-200 bg-green-50/80 p-4 space-y-2 text-sm">
+                      <p className="font-medium text-green-950">Decision recorded for this round</p>
+                      <p className="text-gray-900">
+                        <span className="text-gray-600">Outcome:</span>{" "}
+                        {editorDecisionLabel(roundData.editorDecision)}
+                      </p>
+                      {roundData.editorDecisionNote?.trim() ? (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                            Rationale
+                          </p>
+                          <p className="text-gray-800 whitespace-pre-wrap">{roundData.editorDecisionNote}</p>
+                        </div>
+                      ) : null}
+                      {roundData.decidedAt ? (
+                        <p className="text-xs text-gray-600">
+                          Recorded {new Date(roundData.decidedAt).toLocaleString()}
+                        </p>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/40 shadow-sm p-4">
-                <h3 className="font-semibold text-gray-900">Submitted reviews (this round)</h3>
-                {roundData ? (
-                  <RoundSubmittedReviewsList round={roundData} />
-                ) : (
-                  <p className="text-sm text-gray-500">No round data for this manuscript yet.</p>
-                )}
-              </div>
-
-              <div className="space-y-2 rounded-xl border border-gray-100 shadow-sm p-4">
-                <h3 className="font-semibold text-gray-900">Invitations and deadlines</h3>
-                {(roundData?.invitations ?? []).map((inv) => {
-                  const overdue =
-                    inv.status !== "declined" && new Date(inv.dueAt).getTime() < Date.now();
-                  return (
-                    <div
-                      key={inv.id}
-                      className="border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-2 flex-wrap bg-white shadow-sm"
-                    >
-                      <div>
-                        <p className="text-sm text-gray-900">
-                          {inv.reviewerName} ({inv.reviewerEmail})
-                        </p>
-                        <p className={`text-xs ${overdue ? "text-red-700" : "text-gray-600"}`}>
-                          Due: {new Date(inv.dueAt).toLocaleDateString()} • Status: {inv.status}
-                        </p>
-                      </div>
+                  ) : (
+                    <>
+                      <select
+                        value={decision}
+                        onChange={(e) => setDecision(e.target.value as typeof decision)}
+                        disabled={decisionSubmitting}
+                        className="w-full border border-gray-300 rounded px-3 py-2 cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="revise">Request revision</option>
+                        <option value="accept">Accept manuscript</option>
+                        <option value="reject">Reject</option>
+                        <option value="additional-reviewer">
+                          Request additional reviewer (new round; {reviewsRequiredForDecision} reviews required)
+                        </option>
+                      </select>
+                      <textarea
+                        value={decisionNote}
+                        onChange={(e) => setDecisionNote(e.target.value)}
+                        placeholder="Editorial rationale / consolidated decision note (required)"
+                        rows={4}
+                        disabled={decisionSubmitting}
+                        className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      />
                       <button
                         type="button"
-                        onClick={() => void sendReviewReminder(selected, inv.id)}
-                        className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 shrink-0 cursor-pointer"
+                        disabled={!canDecide || !decisionNote.trim() || decisionSubmitting}
+                        onClick={() => void handleSaveEditorialDecision()}
+                        className="inline-flex items-center justify-center gap-2 min-h-[2.5rem] px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
-                        Send reminder
+                        {decisionSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
+                            Saving…
+                          </>
+                        ) : (
+                          "Save decision"
+                        )}
                       </button>
-                    </div>
-                  );
-                })}
-                {(roundData?.invitations.length ?? 0) === 0 && (
-                  <p className="text-sm text-gray-500">No invitations yet.</p>
-                )}
-              </div>
-
-              <div className="space-y-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
-                <h3 className="font-semibold text-gray-900">Editorial decision</h3>
-                <p className="text-xs text-gray-600">
-                  One decision is recorded per round for audit. After it is saved, the manuscript status
-                  updates and this round&apos;s decision cannot be edited here—use the next workflow stage
-                  or a new review round if applicable.
-                </p>
-                {acceptRejectConflict && !roundDecisionLocked ? (
-                  <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                    Reviewers disagree on <strong>accept</strong> vs <strong>reject</strong>. You may still
-                    record a decision, or choose <strong>Request additional reviewer</strong> to open a new
-                    round (another {reviewsRequiredForDecision} reviews required for that round).
-                  </p>
-                ) : null}
-                {roundDecisionLocked && roundData?.editorDecision ? (
-                  <div className="rounded-lg border border-green-200 bg-green-50/80 p-4 space-y-2 text-sm">
-                    <p className="font-medium text-green-950">Decision recorded for this round</p>
-                    <p className="text-gray-900">
-                      <span className="text-gray-600">Outcome:</span>{" "}
-                      {editorDecisionLabel(roundData.editorDecision)}
-                    </p>
-                    {roundData.editorDecisionNote?.trim() ? (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
-                          Rationale
+                      {!canDecide && (
+                        <p className="text-xs text-amber-700">
+                          At least {reviewsRequiredForDecision} submitted reviews are required before you can save
+                          a decision.
                         </p>
-                        <p className="text-gray-800 whitespace-pre-wrap">{roundData.editorDecisionNote}</p>
-                      </div>
-                    ) : null}
-                    {roundData.decidedAt ? (
-                      <p className="text-xs text-gray-600">
-                        Recorded {new Date(roundData.decidedAt).toLocaleString()}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <>
-                    <select
-                      value={decision}
-                      onChange={(e) => setDecision(e.target.value as typeof decision)}
-                      disabled={decisionSubmitting}
-                      className="w-full border border-gray-300 rounded px-3 py-2 cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="revise">Request revision</option>
-                      <option value="accept">Accept manuscript</option>
-                      <option value="reject">Reject</option>
-                      <option value="additional-reviewer">
-                        Request additional reviewer (new round; {reviewsRequiredForDecision} reviews required)
-                      </option>
-                    </select>
-                    <textarea
-                      value={decisionNote}
-                      onChange={(e) => setDecisionNote(e.target.value)}
-                      placeholder="Editorial rationale / consolidated decision note (required)"
-                      rows={4}
-                      disabled={decisionSubmitting}
-                      className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    />
-                    <button
-                      type="button"
-                      disabled={!canDecide || !decisionNote.trim() || decisionSubmitting}
-                      onClick={() => void handleSaveEditorialDecision()}
-                      className="inline-flex items-center justify-center gap-2 min-h-[2.5rem] px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {decisionSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
-                          Saving…
-                        </>
-                      ) : (
-                        "Save decision"
                       )}
-                    </button>
-                    {!canDecide && (
-                      <p className="text-xs text-amber-700">
-                        At least {reviewsRequiredForDecision} submitted reviews are required before you can save
-                        a decision.
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
               </section>
             </div>
           )}

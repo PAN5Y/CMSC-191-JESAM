@@ -471,11 +471,10 @@ export default function ReviewerPortal() {
                       setSelectedInvitationId(invitation.id);
                     }}
                     disabled={busy}
-                    className={`w-full text-left border rounded p-3 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      selected?.invitation.id === invitation.id
+                    className={`w-full text-left border rounded p-3 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${selected?.invitation.id === invitation.id
                         ? 'border-blue-400 bg-blue-50'
                         : 'border-gray-200 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <p className="text-sm font-medium text-gray-900">
                       {manuscript.reference_code ?? manuscript.id.slice(0, 8)}

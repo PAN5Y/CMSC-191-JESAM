@@ -23,6 +23,8 @@ import {
   getRoundRowId,
 } from '@/lib/peer-review-db';
 import { manuscriptNeedsEditorToStartPostRevisionRound } from '@/modules/revision/hooks/useRevision';
+import { listReviewerCandidatesFromDb } from '@/lib/reviewer-directory-db';
+import { pickNextSuggestedReviewer, REVIEWER_CANDIDATE_POOL } from '@/lib/reviewer-suggestions';
 
 function invitationIdIsUuid(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
@@ -168,6 +170,7 @@ export function usePeerReview() {
 
   const respondInvitation = useCallback(
     async (manuscript: Manuscript, invitationId: string, status: 'accepted' | 'declined') => {
+      let ok = false;
       if (invitationIdIsUuid(invitationId)) {
         const { error } = await updateInvitationStatus(invitationId, status);
         if (error) {
@@ -181,24 +184,26 @@ export function usePeerReview() {
           },
           true
         );
-        return save(manuscript.id, {
+        ok = await save(manuscript.id, {
+          submission_metadata: nextMeta as unknown as Record<string, unknown>,
+        });
+      } else {
+        const peerReview = setInvitationStatus(manuscript, invitationId, status);
+        if (!peerReview) return false;
+        const nextMeta = mergeSubmissionMeta(
+          manuscript,
+          {
+            peer_review: peerReview,
+            audit_logs: appendAudit(manuscript, 'reviewer', `invitation-${status}`),
+          },
+          false
+        );
+        ok = await save(manuscript.id, {
           submission_metadata: nextMeta as unknown as Record<string, unknown>,
         });
       }
 
-      const peerReview = setInvitationStatus(manuscript, invitationId, status);
-      if (!peerReview) return false;
-      const nextMeta = mergeSubmissionMeta(
-        manuscript,
-        {
-          peer_review: peerReview,
-          audit_logs: appendAudit(manuscript, 'reviewer', `invitation-${status}`),
-        },
-        false
-      );
-      return save(manuscript.id, {
-        submission_metadata: nextMeta as unknown as Record<string, unknown>,
-      });
+      return ok;
     },
     [save]
   );
@@ -348,19 +353,19 @@ export function usePeerReview() {
       const peerReview = manuscript.submission_metadata?.peer_review;
       const nextPeer = peerReview
         ? {
-            ...peerReview,
-            rounds: peerReview.rounds.map((round) =>
-              round.round === active
-                ? {
-                    ...round,
-                    editorDecision: decision,
-                    editorDecisionNote: note,
-                    decidedAt: new Date().toISOString(),
-                  }
-                : round
-            ),
-            activeRound: decision === 'additional-reviewer' ? active + 1 : peerReview.activeRound,
-          }
+          ...peerReview,
+          rounds: peerReview.rounds.map((round) =>
+            round.round === active
+              ? {
+                ...round,
+                editorDecision: decision,
+                editorDecisionNote: note,
+                decidedAt: new Date().toISOString(),
+              }
+              : round
+          ),
+          activeRound: decision === 'additional-reviewer' ? active + 1 : peerReview.activeRound,
+        }
         : peerReview;
 
       const nextMeta = mergeSubmissionMeta(
@@ -512,9 +517,8 @@ export function usePeerReview() {
             type: 'review-invitation',
             recipientRole: 'reviewer',
             recipientEmail: invitation.reviewerEmail,
-            message: `Reminder: review due on ${new Date(invitation.dueAt).toLocaleDateString()} for ${
-              manuscript.reference_code ?? manuscript.id
-            }.`,
+            message: `Reminder: review due on ${new Date(invitation.dueAt).toLocaleDateString()} for ${manuscript.reference_code ?? manuscript.id
+              }.`,
           }),
           audit_logs: appendAudit(
             manuscript,
