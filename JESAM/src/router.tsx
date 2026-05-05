@@ -7,6 +7,9 @@ import UnauthorizedPage from "./components/auth/UnauthorizedPage";
 import PublicationDashboard from "./modules/publication-impact/pages/PublicationDashboard";
 import ArticleDetail from "./modules/publication-impact/pages/ArticleDetail";
 import PublicArticlePage from "./modules/publication-impact/pages/PublicArticlePage";
+import JournalsDashboardPage from "./modules/journals-dashboard/pages/JournalsDashboardPage";
+import JournalDetailPage from "./modules/journals-dashboard/pages/JournalDetailPage";
+import ArticleDetailPage from "./modules/journals-dashboard/pages/ArticleDetailPage";
 import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard";
 import SubmissionWorkflow from "./modules/submission/pages/SubmissionWorkflow";
 import EditorDashboard from "./modules/submission/pages/EditorDashboard";
@@ -35,6 +38,9 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
+  { path: "/journals", element: <JournalsDashboardPage /> },
+  { path: "/journals/:journalId", element: <JournalDetailPage /> },
+  { path: "/journals/articles/:articleId", element: <ArticleDetailPage /> },
   { path: "/article/public/:id", element: <PublicArticlePage /> },
   { path: "/browse", element: <JournalsDashboard /> },
   { path: "/journals/public", element: <Navigate to="/browse" replace /> },

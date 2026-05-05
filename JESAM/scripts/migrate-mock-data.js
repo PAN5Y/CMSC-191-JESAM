@@ -1,152 +1,251 @@
-// scripts/migrate-mock-data.js
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
 
-// 1. Initialize Supabase Client
-// Replace these with your actual Supabase project URL and Service Role Key.
-// IMPORTANT: Use the Service Role Key for migrations, not the public anon key, 
-// to bypass Row Level Security (RLS) during the initial data load.
-
-dotenv.config({ path: '.env.local' }); // Load your env variables
+dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Using the powerful key
-const supabase = createClient(supabaseUrl, supabaseKey);
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// 2. Your Mock Data (Adapted slightly for the migration)
-const initialManuscripts = [
-    {
-        id: "JESAM-2026-0405",
-        title: "Carbon Sequestration Potential of Native Hardwood Species in the ASEAN Region",
-        authors: ["Santos, M.A.", "Reyes, J.P.", "Nguyen, T.H."],
-        abstract: "This study examines the carbon sequestration capacity of five native hardwood species across Southeast Asian forests, contributing to climate change mitigation strategies.",
-        keywords: ["Carbon sequestration", "Hardwood species", "Climate change", "ASEAN forestry"],
-        status: "ready_for_production", // Maps to 'Accepted' or 'In Production'
-        classification: "Land",
-        doi: "10.47125/jesam.2026.27.1.05",
-        submittedDate: "2026-03-15",
-        fileUploaded: true,
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error(
+    "Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env or .env.local"
+  );
+}
+
+const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+const seededPublicArticles = [
+  {
+    title: "Climate Resilience Planning for Upland Farming Communities",
+    authors: ["Santos, M.A.", "Reyes, J.P.", "Navarro, C.L."],
+    abstract:
+      "This paper evaluates how upland farming communities adapt to rainfall variability through diversified cropping, localized forecasting, and cooperative planning. The findings highlight practical resilience measures that can be scaled through regional policy support.",
+    keywords: ["climate resilience", "upland farming", "adaptation", "policy"],
+    status: "Published",
+    classification: "Land",
+    doi: "10.47125/jesam.2026.27.1.01",
+    issue_assignment: "Volume 27 Issue 1",
+    created_at: "2026-01-12T08:30:00.000Z",
+    published_at: "2026-02-18T09:00:00.000Z",
+    metrics: {
+      views: 186,
+      downloads: 74,
+      citations: 3,
     },
-    {
-        id: "JESAM-2026-0398",
-        title: "Microplastic Contamination in Coastal Waters of Manila Bay",
-        authors: ["Garcia, L.M.", "Tan, S.Y."],
-        abstract: "An assessment of microplastic pollution levels and sources in Manila Bay coastal ecosystems.",
-        keywords: ["Microplastics", "Marine pollution", "Manila Bay"],
-        status: "missing_doi", // Maps to 'Accepted'
-        classification: "Water",
-        submittedDate: "2026-03-10",
-        fileUploaded: true,
+  },
+  {
+    title: "Microplastic Pathways Across Estuarine Water Systems in Luzon",
+    authors: ["Garcia, L.M.", "Tan, S.Y.", "David, P.R."],
+    abstract:
+      "The study traces microplastic transport across estuarine systems in Luzon using seasonal sampling and sediment comparison. Results show recurring hotspots near urban discharge corridors and identify monitoring priorities for coastal management.",
+    keywords: ["microplastics", "estuaries", "water quality", "Luzon"],
+    status: "Published",
+    classification: "Water",
+    doi: "10.47125/jesam.2026.27.1.02",
+    issue_assignment: "Volume 27 Issue 1",
+    created_at: "2026-01-18T10:15:00.000Z",
+    published_at: "2026-02-20T09:00:00.000Z",
+    metrics: {
+      views: 241,
+      downloads: 102,
+      citations: 6,
     },
-    {
-        id: "JESAM-2026-0387",
-        title: "Urban Heat Island Effect in Metro Manila: A Remote Sensing Approach",
-        authors: ["Cruz, R.D.", "Lim, K.W.", "Fernandez, A.B."],
-        abstract: "Using satellite imagery to analyze urban heat distribution patterns and mitigation opportunities.",
-        keywords: ["Urban heat island", "Remote sensing", "Urban planning"],
-        status: "published", // Maps to 'Published'
-        classification: "Air",
-        doi: "10.47125/jesam.2026.27.1.03",
-        submittedDate: "2026-02-20",
-        fileUploaded: true,
-        metrics: {
-            views: 342,
-            downloads: 128,
-            citations: 5,
-            altmetric: 8.3,
-        },
+  },
+  {
+    title: "Urban Heat Exposure Mapping Near Public School Corridors",
+    authors: ["Cruz, R.D.", "Lim, K.W.", "Fernandez, A.B."],
+    abstract:
+      "Using remote sensing and field validation, this article maps heat exposure around public school corridors in Metro Manila. The paper identifies high-risk time windows and recommends low-cost shading and ventilation interventions.",
+    keywords: ["urban heat", "remote sensing", "schools", "air"],
+    status: "Published",
+    classification: "Air",
+    doi: "10.47125/jesam.2026.27.1.03",
+    issue_assignment: "Volume 27 Issue 1",
+    created_at: "2026-01-25T07:45:00.000Z",
+    published_at: "2026-02-25T09:00:00.000Z",
+    metrics: {
+      views: 319,
+      downloads: 128,
+      citations: 8,
     },
-    {
-        id: "JESAM-2026-0412",
-        title: "Biodiversity Assessment of Mangrove Ecosystems in Southern Philippines",
-        authors: ["Reyes, M.C.", "Santos, D.L."],
-        abstract: "Comprehensive survey of flora and fauna diversity in mangrove forests with conservation recommendations.",
-        keywords: ["Biodiversity", "Mangroves", "Conservation", "Philippines"],
-        status: "ready_for_production", // Maps to 'Accepted'
-        classification: "People",
-        submittedDate: "2026-03-22",
-        fileUploaded: false,
+  },
+  {
+    title: "Community Waste Segregation Behavior in Flood-Prone Barangays",
+    authors: ["Villanueva, E.P.", "Lopez, R.M."],
+    abstract:
+      "This article examines how household waste segregation behavior changes in flood-prone barangays when local ordinances, peer influence, and collection reliability vary across communities. The findings emphasize governance and trust as major determinants of environmental participation.",
+    keywords: ["communities", "waste management", "governance", "behavior"],
+    status: "Published",
+    classification: "People",
+    doi: "10.47125/jesam.2026.27.1.04",
+    issue_assignment: "Volume 27 Issue 1",
+    created_at: "2026-01-29T11:00:00.000Z",
+    published_at: "2026-02-28T09:00:00.000Z",
+    metrics: {
+      views: 167,
+      downloads: 59,
+      citations: 2,
     },
+  },
 ];
 
-// 3. Helper Function to Map Status
-// This maps your mock status strings to the standard Supabase schema we defined.
-function mapStatus(mockStatus) {
-    switch (mockStatus) {
-        case 'published': return 'Published';
-        case 'ready_for_production': return 'In Production';
-        case 'missing_doi': return 'Accepted';
-        case 'correction_pending': return 'Return to Revision';
-        default: return 'Accepted';
-    }
+async function getExistingManuscriptByTitle(title) {
+  const { data, error } = await supabase
+    .from("manuscripts")
+    .select("id, title, doi")
+    .eq("title", title)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
-// 4. Migration Execution
-async function migrateData() {
-    console.log('Starting migration...');
+async function getExistingManuscriptByDoi(doi) {
+  if (!doi) {
+    return null;
+  }
 
-    // Optionally pass an author's User ID to link these mock manuscripts to them
-    const submitterId = process.argv[2] || null;
-    if (submitterId) {
-        console.log(`Linking manuscripts to submitter_id: ${submitterId}`);
+  const { data, error } = await supabase
+    .from("manuscripts")
+    .select("id, title, doi")
+    .eq("doi", doi)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function findExistingManuscript(article) {
+  const [titleMatch, doiMatch] = await Promise.all([
+    getExistingManuscriptByTitle(article.title),
+    getExistingManuscriptByDoi(article.doi),
+  ]);
+
+  if (titleMatch && doiMatch && titleMatch.id !== doiMatch.id) {
+    throw new Error(
+      `Conflicting manuscript matches for "${article.title}" and DOI "${article.doi}".`
+    );
+  }
+
+  if (doiMatch) {
+    return doiMatch;
+  }
+
+  if (titleMatch) {
+    return titleMatch;
+  }
+
+  return null;
+}
+
+async function ensureMetricsRow(manuscriptId, metrics) {
+  const { data: existingMetrics, error: metricsFetchError } = await supabase
+    .from("article_metrics")
+    .select("id")
+    .eq("manuscript_id", manuscriptId)
+    .limit(1)
+    .maybeSingle();
+
+  if (metricsFetchError) {
+    throw metricsFetchError;
+  }
+
+  if (existingMetrics) {
+    const { error: metricsUpdateError } = await supabase
+      .from("article_metrics")
+      .update(metrics)
+      .eq("manuscript_id", manuscriptId);
+
+    if (metricsUpdateError) {
+      throw metricsUpdateError;
+    }
+
+    return "updated";
+  }
+
+  const { error: metricsInsertError } = await supabase
+    .from("article_metrics")
+    .insert([{ manuscript_id: manuscriptId, ...metrics }]);
+
+  if (metricsInsertError) {
+    throw metricsInsertError;
+  }
+
+  return "inserted";
+}
+
+async function seedPublicArchive() {
+  console.log("Seeding public journals demo data...");
+
+  for (const article of seededPublicArticles) {
+    const existing = await findExistingManuscript(article);
+    let manuscriptId = existing?.id;
+
+    if (!manuscriptId) {
+      const { data: insertedManuscript, error: insertError } = await supabase
+        .from("manuscripts")
+        .insert([
+          {
+            title: article.title,
+            authors: article.authors,
+            abstract: article.abstract,
+            keywords: article.keywords,
+            status: article.status,
+            classification: article.classification,
+            doi: article.doi,
+            issue_assignment: article.issue_assignment,
+            created_at: article.created_at,
+            published_at: article.published_at,
+          },
+        ])
+        .select("id")
+        .single();
+
+      if (insertError || !insertedManuscript) {
+        throw insertError ?? new Error(`Failed to insert ${article.title}`);
+      }
+
+      manuscriptId = insertedManuscript.id;
+      console.log(`Inserted manuscript: ${article.title}`);
     } else {
-        console.log('No submitter_id provided. Manuscripts will be unassigned.');
+      const { error: updateError } = await supabase
+        .from("manuscripts")
+        .update({
+          authors: article.authors,
+          abstract: article.abstract,
+          keywords: article.keywords,
+          status: article.status,
+          classification: article.classification,
+          doi: article.doi,
+          issue_assignment: article.issue_assignment,
+          published_at: article.published_at,
+        })
+        .eq("id", manuscriptId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      console.log(`Updated manuscript: ${article.title}`);
     }
 
-    for (const ms of initialManuscripts) {
-        // Prepare the manuscript record
-        const manuscriptRecord = {
-            // Note: We are ignoring the 'JESAM-2026-0405' string ID here because 
-            // the Supabase schema expects a UUID. Supabase will auto-generate it.
-            submitter_id: submitterId,
-            title: ms.title,
-            abstract: ms.abstract,
-            authors: ms.authors, // Supabase jsonb handles JS arrays automatically
-            keywords: ms.keywords, // Supabase jsonb handles JS arrays automatically
-            status: mapStatus(ms.status),
-            doi: ms.doi || null,
-            created_at: new Date(ms.submittedDate).toISOString(),
-            published_at: ms.status === 'published' ? new Date().toISOString() : null,
-            // You can add a 'classification' column to your Supabase schema if needed, 
-            // or just rely on keywords.
-        };
+    const metricsResult = await ensureMetricsRow(manuscriptId, article.metrics);
+    console.log(`${metricsResult} metrics: ${article.title}`);
+  }
 
-        // Insert Manuscript
-        const { data: insertedManuscript, error: insertError } = await supabase
-            .from('manuscripts')
-            .insert([manuscriptRecord])
-            .select() // Return the inserted row to get the generated UUID
-            .single();
-
-        if (insertError) {
-            console.error(`Error inserting manuscript "${ms.title}":`, insertError);
-            continue; // Skip to the next one
-        }
-
-        console.log(`Inserted manuscript: ${insertedManuscript.id}`);
-
-        // If it has metrics, insert those using the newly generated UUID
-        if (ms.metrics) {
-            const metricsRecord = {
-                manuscript_id: insertedManuscript.id, // Use the real UUID
-                views: ms.metrics.views,
-                downloads: ms.metrics.downloads,
-                citations: ms.metrics.citations,
-                // altmetric isn't in our base schema, but you could add it to the table
-            };
-
-            const { error: metricsError } = await supabase
-                .from('article_metrics')
-                .insert([metricsRecord]);
-
-            if (metricsError) {
-                console.error(`Error inserting metrics for ${insertedManuscript.id}:`, metricsError);
-            } else {
-                console.log(`Inserted metrics for: ${insertedManuscript.id}`);
-            }
-        }
-    }
-    console.log('Migration complete!');
+  console.log("Public journals demo data ready.");
 }
 
-migrateData();
+seedPublicArchive().catch((error) => {
+  console.error("Seed failed:", error);
+  process.exitCode = 1;
+});
