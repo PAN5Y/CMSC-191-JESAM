@@ -10,6 +10,8 @@ import {
   FileWarning,
   CheckCircle2,
   AlertCircle,
+  Eye,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +31,7 @@ import ArticlePreviewModal from "../components/ArticlePreviewModal";
 import MetadataExportModal from "../components/MetadataExportModal";
 import ManuscriptPdfViewer from "@/components/common/ManuscriptPdfViewer";
 import type { Manuscript } from "../types";
+import type { GalleyVersion } from "@/types";
 
 export default function ArticleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -48,9 +51,14 @@ export default function ArticleDetail() {
     retractManuscript,
     assignIssue,
     refreshMetrics,
+    transitionStatus,
+    authorApproveGalley,
+    authorRequestCorrections,
+    fetchGalleyVersionsForManuscript,
   } = useManuscripts();
 
   const [manuscript, setManuscript] = useState<Manuscript | null>(null);
+  const [latestGalley, setLatestGalley] = useState<GalleyVersion | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -67,16 +75,28 @@ export default function ArticleDetail() {
       setLoading(true);
       const data = await getById(id);
       setManuscript(data);
+      if (data) {
+        const versions = await fetchGalleyVersionsForManuscript(id);
+        if (versions.length > 0) {
+          setLatestGalley(versions[0]); // versions are ordered DESC
+        }
+      }
       setLoading(false);
     }
     fetch();
-  }, [id, getById]);
+  }, [id, getById, fetchGalleyVersionsForManuscript]);
 
   // Refetch helper
   const refetch = async () => {
     if (!id) return;
     const data = await getById(id);
     setManuscript(data);
+    if (data) {
+      const versions = await fetchGalleyVersionsForManuscript(id);
+      if (versions.length > 0) {
+        setLatestGalley(versions[0]);
+      }
+    }
   };
 
   if (loading) {
@@ -145,6 +165,104 @@ export default function ArticleDetail() {
           </div>
         </div>
       </header>
+
+      {/* ── Author Galley Review — Final Galley Approval Card ── */}
+      {isAuthor && manuscript.status === "Author Galley Review" && (() => {
+        return (
+          <div className="mx-8 mt-6 p-6 bg-white border-2 border-[#ffb74d] rounded-lg shadow-md">
+            <div className="flex items-start gap-4">
+              <div className="flex items-center justify-center size-12 bg-[#e65100]/10 rounded-full shrink-0">
+                <Eye className="size-6 text-[#e65100]" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-['Newsreader',serif] text-[22px] text-[#1a1c1c] mb-1">
+                  Final Galley Approval
+                </h3>
+                <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif] mb-5">
+                  Your galley proof has been reviewed by the editorial team. Please review
+                  their remarks below, then approve the galley or request corrections.
+                </p>
+
+                {/* Warning if no galley versions exist */}
+                {!latestGalley && (
+                  <div className="mb-5 p-4 bg-[#fff3e0] border border-[#ffb74d] rounded-lg flex items-start gap-2">
+                    <AlertCircle className="size-5 text-[#e65100] mt-0.5 shrink-0" />
+                    <p className="text-sm text-[#e65100] font-['Public_Sans',sans-serif]">
+                      No file versions found. Please wait for the editorial team to upload the galley file.
+                    </p>
+                  </div>
+                )}
+
+                {/* Editor Remarks & Galley File Section */}
+                {latestGalley && (
+                  <div className="mb-5 p-4 bg-[#f9fafb] border border-[#e0e0e0] rounded-lg">
+                    {/* Remarks (if any) */}
+                    {manuscript.editor_remarks && (
+                      <div className="mb-4">
+                        <h5 className="text-xs uppercase tracking-wider text-[#3f4b7e] font-['Public_Sans',sans-serif] mb-2 font-semibold">
+                          Editor's Remarks
+                        </h5>
+                        <p className="text-sm text-[#1a1c1c] font-['Public_Sans',sans-serif] whitespace-pre-wrap leading-relaxed">
+                          {manuscript.editor_remarks}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Correction file download */}
+                    <div className="flex items-center gap-2 p-2.5 bg-[#e8eaf6] rounded-lg">
+                      <FileCheck className="size-4 text-[#3f4b7e]" />
+                      <div className="flex flex-col flex-1">
+                        <span className="text-xs font-semibold text-[#1a1c1c] font-['Public_Sans',sans-serif]">
+                          Latest Galley — v{latestGalley.revision_number}
+                        </span>
+                        <span className="text-[10px] text-[#9e9e9e] font-['Public_Sans',sans-serif]">
+                          Uploaded {new Date(latestGalley.submitted_at).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric",
+                          })}
+                        </span>
+                      </div>
+                      <a
+                        href={latestGalley.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-[#3f4b7e] underline hover:text-[#3f4b7e]/80 font-['Public_Sans',sans-serif] px-2"
+                      >
+                        Download
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  <button
+                    disabled={!latestGalley}
+                    onClick={async () => {
+                      const success = await authorApproveGalley(manuscript.id);
+                      if (success) await refetch();
+                    }}
+                    className="flex items-center gap-2 px-6 py-3 bg-[#2e7d32] text-white text-sm font-medium font-['Public_Sans',sans-serif] rounded-lg hover:bg-[#2e7d32]/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="size-4" />
+                    Sign-off &amp; Approve for Publication
+                  </button>
+                  <button
+                    disabled={!latestGalley}
+                    onClick={async () => {
+                      const success = await authorRequestCorrections(manuscript.id);
+                      if (success) await refetch();
+                    }}
+                    className="flex items-center gap-2 px-5 py-3 bg-white border border-[#e0e0e0] text-[#6b7280] text-sm font-['Public_Sans',sans-serif] rounded-lg hover:border-[#e65100] hover:text-[#e65100] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw className="size-4" />
+                    Request Corrections
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Main Workflow Container */}
       <main className="px-8 py-12">

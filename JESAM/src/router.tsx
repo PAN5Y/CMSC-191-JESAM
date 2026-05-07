@@ -72,6 +72,7 @@ export const router = createBrowserRouter([
       <ProtectedRoute
         allowedRoles={[
           "production_editor",
+          "technical_editor",
           "reviewer",
           "managing_editor",
           "associate_editor",
@@ -124,7 +125,7 @@ export const router = createBrowserRouter([
   // ── Publication / Production routes ──
   {
     path: "/publication/dashboard",
-    element: <ProtectedRoute allowedRoles={["production_editor", "system_admin"]} />,
+    element: <ProtectedRoute allowedRoles={["managing_editor", "production_editor", "technical_editor", "system_admin"]} />,
     children: [
       {
         element: <AppLayout />,
@@ -225,6 +226,7 @@ export const router = createBrowserRouter([
         allowedRoles={[
           "associate_editor",
           "managing_editor",
+          "technical_editor",
           "reviewer",
           "production_editor",
           "editor_in_chief",

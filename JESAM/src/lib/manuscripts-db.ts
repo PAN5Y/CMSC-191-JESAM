@@ -54,11 +54,14 @@ export async function listManuscriptsFromDb(
     query = query.eq("status", status);
   } else if (publicationStatusesOnly) {
     const pub = [
-      "Accepted",
-      "In Production",
+      "In Layout",
+      "Proofreading",
+      "Author Galley Review",
+      "Scheduled for Publication",
+      "In Issue Management",
       "Published",
-      "Return to Revision",
-      "Retracted",
+      "Archived",
+      "Declined",
     ] as const;
     query = query.in("status", [...pub]);
   }

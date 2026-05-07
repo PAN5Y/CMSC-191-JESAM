@@ -58,6 +58,41 @@ const statusConfig: Partial<
     text: "text-white",
     label: "Retracted",
   },
+  "In Layout": {
+    bg: "bg-[#ede7f6]",
+    text: "text-[#5e35b1]",
+    label: "In Layout",
+  },
+  Proofreading: {
+    bg: "bg-[#e0f2f1]",
+    text: "text-[#00695c]",
+    label: "Proofreading",
+  },
+  "Author Galley Review": {
+    bg: "bg-[#fff3e0]",
+    text: "text-[#e65100]",
+    label: "Author Galley Review",
+  },
+  "Scheduled for Publication": {
+    bg: "bg-[#e8eaf6]",
+    text: "text-[#283593]",
+    label: "Scheduled",
+  },
+  "In Issue Management": {
+    bg: "bg-[#e1f5fe]",
+    text: "text-[#01579b]",
+    label: "Issue Management",
+  },
+  Archived: {
+    bg: "bg-[#efebe9]",
+    text: "text-[#4e342e]",
+    label: "Archived",
+  },
+  Declined: {
+    bg: "bg-[#ffebee]",
+    text: "text-[#b71c1c]",
+    label: "Declined",
+  },
 };
 
 interface StatusBadgeProps {
