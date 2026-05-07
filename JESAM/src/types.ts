@@ -227,7 +227,10 @@ export interface SubmissionMetadata {
     submittedBy: string;
     submittedAt: string;
   };
+  /** Timestamp of successful DOI deposit with Crossref. */
+  doi_deposited_at?: string;
 }
+
 
 export interface Manuscript {
   id: string;

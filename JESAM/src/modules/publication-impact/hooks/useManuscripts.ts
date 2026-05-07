@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { depositDOI, generateDOIString } from "@/lib/crossref";
+import { depositToZenodo } from "@/lib/zenodo";
+import { generateDOIString } from "@/lib/crossref";
 import {
   listManuscriptsFromDb,
   updateManuscriptRow,
@@ -250,7 +251,16 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         notifications: newNotifications,
       };
 
+      // ── Proactive DOI Generation ──
+      // Automatically generate a DOI string when entering the publication pipeline
+      if (targetStatus === "In Layout" && !manuscript.doi) {
+        const generatedDoi = generateDOIString(manuscript);
+        updates.doi = generatedDoi;
+        toast.info(`Pre-generated DOI: ${generatedDoi}`);
+      }
+
       const success = await updateManuscript(id, updates);
+
       if (!success) return false;
 
       // Special: Published → insert metrics row
@@ -530,14 +540,14 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         const fresh = await getById(id);
         if (!fresh) return { success: false, doi: "", error: "Manuscript not found" };
 
-        const result = await depositDOI(fresh);
+        const result = await depositToZenodo(fresh);
         if (result.success) {
           await updateManuscript(id, { doi: result.doi });
         }
         return result;
       }
 
-      const result = await depositDOI(manuscript);
+      const result = await depositToZenodo(manuscript);
       if (result.success) {
         await updateManuscript(id, { doi: result.doi });
       } else {
@@ -576,7 +586,27 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         },
       };
 
+      // ── Automatic DOI Registration (Deposit) ──
+      // When publishing, we ensure the DOI is deposited with Zenodo.
+      if (manuscript.doi || updates.doi) {
+        const doiToDeposit = (updates.doi as string) || (manuscript.doi as string);
+        toast.info(`Depositing DOI ${doiToDeposit} with Zenodo...`);
+        
+        const doiResult = await depositToZenodo(manuscript);
+        if (doiResult.success) {
+          toast.success("DOI metadata deposited with Zenodo");
+          // Track the successful deposit in metadata
+          updates.submission_metadata = {
+            ...(updates.submission_metadata || manuscript.submission_metadata || {}),
+            doi_deposited_at: new Date().toISOString(),
+          } as SubmissionMetadata;
+        } else {
+          toast.warning(`DOI deposit failed: ${doiResult.error}. You may need to register it manually later.`);
+        }
+      }
+
       const success = await updateManuscript(id, updates);
+
       if (!success) return false;
 
       const { error: metricsError } = await supabase
