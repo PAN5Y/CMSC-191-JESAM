@@ -12,23 +12,37 @@ export type ManuscriptStatus =
   | "Rejected"
   | "Accepted"
   | "In Production"
+  | "In Layout"
+  | "Proofreading"
+  | "Author Galley Review"
+  | "Scheduled for Publication"
+  | "In Issue Management"
   | "Published"
+  | "Archived"
   | "Return to Revision"
-  | "Retracted";
+  | "Retracted"
+  | "Declined";
 
 /** Statuses shown on Publication & Impact dashboard (post-acceptance pipeline). */
 export const PUBLICATION_PIPELINE_STATUSES: ManuscriptStatus[] = [
   "Accepted",
   "In Production",
+  "In Layout",
+  "Proofreading",
+  "Author Galley Review",
+  "Scheduled for Publication",
+  "In Issue Management",
   "Published",
   "Return to Revision",
   "Retracted",
+  "Declined"
 ];
 
 export type AppRole =
   | "author"
   | "reviewer"
   | "associate_editor"
+  | "technical_editor"
   | "managing_editor"
   | "production_editor"
   | "editor_in_chief"
@@ -131,14 +145,14 @@ export interface RevisionVersion {
 export interface NotificationEvent {
   id: string;
   type:
-    | "submission-received"
-    | "screening-decision"
-    | "review-invitation"
-    | "review-submitted"
-    | "revision-requested"
-    | "revision-submitted"
-    | "accepted"
-    | "published";
+  | "submission-received"
+  | "screening-decision"
+  | "review-invitation"
+  | "review-submitted"
+  | "revision-requested"
+  | "revision-submitted"
+  | "accepted"
+  | "published";
   recipientRole: AppRole | "public";
   recipientEmail?: string;
   message: string;
