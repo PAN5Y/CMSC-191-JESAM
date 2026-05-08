@@ -71,7 +71,7 @@ function validateMetadata(m: ResearchMetadata): boolean {
   return (
     m.title.trim().length > 0 &&
     m.abstract.trim().length > 0 &&
-    m.keywords.trim().length > 0 &&
+    m.keywords.length > 0 &&
     ["Land", "Air", "Water", "People"].includes(m.focus) &&
     m.subjectArea.trim().length > 0 &&
     m.funding.trim().length > 0 &&
