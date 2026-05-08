@@ -133,7 +133,9 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         !!manuscript.title &&
         manuscript.authors.length > 0 &&
         manuscript.keywords.length > 0;
-      const hasFile = !!manuscript.file_url;
+      // In the Publication & Impact module, we assume an initial file exists 
+      // from the submission or revision process, so we default to true.
+      const hasFile = true;
       const hasDOI = !!manuscript.doi;
 
       return {
@@ -285,7 +287,7 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
 
   /* ── Complete Layout: upload galley file + move to Proofreading ── */
   const completeLayout = useCallback(
-    async (id: string, file: File, note: string): Promise<boolean> => {
+    async (id: string, file: File | null, note: string): Promise<boolean> => {
       const manuscript = manuscripts.find((m) => m.id === id);
       if (!manuscript) {
         toast.error("Manuscript not found");
@@ -300,24 +302,30 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         return false;
       }
 
-      // Upload galley file + insert version row
-      const { data: version, error: insertError } = await insertGalleyVersion(
-        id, file, user.id, note
-      );
+      let versionStr = "without new file";
 
-      if (insertError || !version) {
-        toast.error(`Failed to upload galley: ${insertError?.message ?? "Unknown error"}`);
-        return false;
+      if (file) {
+        // Upload galley file + insert version row
+        const { data: version, error: insertError } = await insertGalleyVersion(
+          id, file, user.id, note
+        );
+
+        if (insertError || !version) {
+          toast.error(`Failed to upload galley: ${insertError?.message ?? "Unknown error"}`);
+          return false;
+        }
+
+        // Update latest galley cache
+        setLatestGalleys((prev) => new Map(prev).set(id, version));
+        // Invalidate full version list cache
+        setGalleyVersionsMap((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+
+        versionStr = `v${version.revision_number}`;
       }
-
-      // Update latest galley cache
-      setLatestGalleys((prev) => new Map(prev).set(id, version));
-      // Invalidate full version list cache
-      setGalleyVersionsMap((prev) => {
-        const next = new Map(prev);
-        next.delete(id);
-        return next;
-      });
 
       // Transition to Proofreading
       const actorRole = role ?? "system_admin";
@@ -328,18 +336,18 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         status: "Proofreading" as ManuscriptStatus,
         submission_metadata: {
           ...prevMeta,
-          audit_logs: appendAudit(manuscript, actorRole, `layout-completed:v${version.revision_number}`, note),
+          audit_logs: appendAudit(manuscript, actorRole, `layout-completed:${versionStr}`, note),
           notifications: appendNotification(manuscript, {
             type: "revision-requested",
             recipientRole: "author",
-            message: `${reference}: Layout v${version.revision_number} completed. Moving to proofreading.`,
+            message: `${reference}: Layout ${versionStr} completed. Moving to proofreading.`,
           }),
         },
       };
 
       const success = await updateManuscript(id, updates);
       if (success) {
-        toast.success(`Layout v${version.revision_number} uploaded — moved to Proofreading`);
+        toast.success(`Layout completed ${versionStr} — moved to Proofreading`);
       }
       return success;
     },
@@ -351,7 +359,8 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
     async (
       id: string,
       decision: "return" | "approve",
-      remarks: string
+      remarks: string,
+      file: File | null = null
     ): Promise<boolean> => {
       const manuscript = manuscripts.find((m) => m.id === id);
       if (!manuscript) {
@@ -363,6 +372,31 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
         return false;
       }
 
+      let versionStr = "without new file";
+      if (file) {
+        if (!user?.id) {
+          toast.error("You must be signed in to upload a file");
+          return false;
+        }
+        const { data: version, error: insertError } = await insertGalleyVersion(
+          id, file, user.id, remarks
+        );
+
+        if (insertError || !version) {
+          toast.error(`Failed to upload galley: ${insertError?.message ?? "Unknown error"}`);
+          return false;
+        }
+
+        setLatestGalleys((prev) => new Map(prev).set(id, version));
+        setGalleyVersionsMap((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+
+        versionStr = `v${version.revision_number}`;
+      }
+
       const actorRole = role ?? "system_admin";
       const reference = manuscript.reference_code ?? manuscript.id.slice(0, 8);
       const prevMeta = manuscript.submission_metadata ?? {};
@@ -372,8 +406,8 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
 
       const auditAction =
         decision === "return"
-          ? `proofreading-return:Proofreading→In Layout`
-          : `proofreading-approve:Proofreading→Author Galley Review`;
+          ? `proofreading-return:Proofreading→In Layout (${versionStr})`
+          : `proofreading-approve:Proofreading→Author Galley Review (${versionStr})`;
 
       const notifMessage =
         decision === "return"
@@ -400,9 +434,9 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
       if (!success) return false;
 
       if (decision === "return") {
-        toast.success("Returned to layout with remarks");
+        toast.success(`Returned to layout with remarks ${versionStr}`);
       } else {
-        toast.success("Sent to Author Galley Review");
+        toast.success(`Sent to Author Galley Review ${versionStr}`);
       }
       return true;
     },
@@ -450,21 +484,45 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
 
   /* ── Author requests corrections (returns to Proofreading) ── */
   const authorRequestCorrections = useCallback(
-    async (id: string): Promise<boolean> => {
+    async (id: string, file: File, remarks: string): Promise<boolean> => {
       const manuscript = manuscripts.find((m) => m.id === id);
       if (!manuscript) {
         toast.error("Manuscript not found");
         return false;
       }
+      if (!user?.id) {
+        toast.error("You must be signed in");
+        return false;
+      }
+
+      // Upload correction file + insert version row
+      const { data: version, error: insertError } = await insertGalleyVersion(
+        id, file, user.id, remarks
+      );
+
+      if (insertError || !version) {
+        toast.error(`Failed to upload correction file: ${insertError?.message ?? "Unknown error"}`);
+        return false;
+      }
+
+      // Update caches
+      setLatestGalleys((prev) => new Map(prev).set(id, version));
+      setGalleyVersionsMap((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+
       const reference = manuscript.reference_code ?? manuscript.id.slice(0, 8);
       const prevMeta = manuscript.submission_metadata ?? {};
 
       const updates: Partial<Manuscript> = {
-        status: "Proofreading" as ManuscriptStatus,
+        status: "In Layout" as ManuscriptStatus,
         author_approved: false,
+        editor_remarks: `Author Correction Request:\n${remarks}`,
         submission_metadata: {
           ...prevMeta,
-          audit_logs: appendAudit(manuscript, "author", "author-galley-corrections-requested"),
+          audit_logs: appendAudit(manuscript, "author", "author-galley-corrections-requested", remarks),
           notifications: appendNotification(manuscript, {
             type: "revision-requested",
             recipientRole: "production_editor",
@@ -475,11 +533,11 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
 
       const success = await updateManuscript(id, updates);
       if (success) {
-        toast.success("Corrections requested — returned to Proofreading");
+        toast.success("Corrections requested — returned to Layout for updates");
       }
       return success;
     },
-    [manuscripts, updateManuscript]
+    [manuscripts, updateManuscript, user?.id]
   );
 
   const saveMetadata = useCallback(
@@ -542,15 +600,20 @@ export function useManuscripts(options?: UseManuscriptsOptions) {
 
         const result = await depositToZenodo(fresh);
         if (result.success) {
+          toast.success(`Zenodo DOI successfully generated: ${result.doi}`);
           await updateManuscript(id, { doi: result.doi });
+        } else {
+          toast.error(`Zenodo DOI generation failed: ${result.error || "Unknown error"}`);
         }
         return result;
       }
 
       const result = await depositToZenodo(manuscript);
       if (result.success) {
+        toast.success(`Zenodo DOI successfully generated: ${result.doi}`);
         await updateManuscript(id, { doi: result.doi });
       } else {
+        toast.error(`Zenodo DOI generation failed: ${result.error || "Unknown error"}`);
         const fallbackDOI = generateDOIString(manuscript);
         return { ...result, doi: fallbackDOI };
       }

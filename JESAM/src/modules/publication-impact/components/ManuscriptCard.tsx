@@ -32,11 +32,12 @@ interface ManuscriptCardProps {
     targetStatus: ManuscriptStatus,
     opts?: { isReturn?: boolean }
   ) => Promise<boolean>;
-  onCompleteLayout: (id: string, file: File, note: string) => Promise<boolean>;
+  onCompleteLayout: (id: string, file: File | null, note: string) => Promise<boolean>;
   onProofreadingDecision: (
     id: string,
     decision: "return" | "approve",
-    remarks: string
+    remarks: string,
+    file?: File | null
   ) => Promise<boolean>;
   onLoadVersionHistory?: (id: string) => Promise<GalleyVersion[]>;
 }
@@ -139,7 +140,9 @@ export default function ManuscriptCard({
 
   // Proofreading form state
   const [proofRemarks, setProofRemarks] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
   const [submittingProof, setSubmittingProof] = useState(false);
+  const proofFileRef = useRef<HTMLInputElement>(null);
 
   // Version history
   const [showHistory, setShowHistory] = useState(false);
@@ -171,7 +174,6 @@ export default function ManuscriptCard({
   };
 
   const handleLayoutSubmit = async () => {
-    if (!layoutFile) return;
     setSubmittingLayout(true);
     try {
       const success = await onCompleteLayout(
@@ -197,9 +199,13 @@ export default function ManuscriptCard({
       const success = await onProofreadingDecision(
         manuscript.id,
         decision,
-        proofRemarks.trim()
+        proofRemarks.trim(),
+        proofFile
       );
-      if (success) setProofRemarks("");
+      if (success) {
+        setProofRemarks("");
+        setProofFile(null);
+      }
     } finally {
       setSubmittingProof(false);
     }
@@ -216,7 +222,7 @@ export default function ManuscriptCard({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-[#e0e0e0] overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg shadow-sm border border-[#e0e0e0] hover:shadow-md transition-shadow">
       {/* ── Header ── */}
       <div className="p-6 pb-4">
         <div className="flex items-start justify-between gap-4">
@@ -477,11 +483,11 @@ export default function ManuscriptCard({
             />
 
             <button
-              disabled={!layoutFile || submittingLayout}
+              disabled={submittingLayout}
               onClick={handleLayoutSubmit}
               className="w-full py-2.5 rounded-lg text-sm font-['Public_Sans',sans-serif] font-medium bg-[#3f4b7e] text-white hover:bg-[#3f4b7e]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submittingLayout ? "Uploading..." : "Upload & Move to Proofreading"}
+              {submittingLayout ? "Uploading..." : "Move to Proofreading"}
             </button>
           </div>
         </div>
@@ -506,6 +512,37 @@ export default function ManuscriptCard({
                 </p>
               </div>
             )}
+
+            {/* Optional Proofreading File Upload */}
+            <input
+              ref={proofFileRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+            />
+            {proofFile ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#e8eaf6] rounded-lg mb-3">
+                <FileText className="size-4 text-[#3f4b7e]" />
+                <span className="text-xs text-[#3f4b7e] font-['Public_Sans',sans-serif] flex-1 truncate">
+                  {proofFile.name}
+                </span>
+                <button
+                  onClick={() => setProofFile(null)}
+                  className="p-0.5 hover:bg-[#3f4b7e]/10 rounded"
+                >
+                  <X className="size-3 text-[#3f4b7e]" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => proofFileRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-3 text-xs font-['Public_Sans',sans-serif] text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-lg hover:border-[#3f4b7e] hover:text-[#3f4b7e] transition-colors w-full justify-center mb-3"
+              >
+                <Upload className="size-4" />
+                Optional: Upload corrected file
+              </button>
+            )}
+
 
             <textarea
               value={proofRemarks}

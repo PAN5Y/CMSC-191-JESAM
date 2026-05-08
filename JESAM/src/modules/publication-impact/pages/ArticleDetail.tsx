@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -12,6 +12,8 @@ import {
   AlertCircle,
   Eye,
   RotateCcw,
+  X,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -59,7 +61,14 @@ export default function ArticleDetail() {
 
   const [manuscript, setManuscript] = useState<Manuscript | null>(null);
   const [latestGalley, setLatestGalley] = useState<GalleyVersion | null>(null);
+  const [latestAuthorRevision, setLatestAuthorRevision] = useState<GalleyVersion | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Author Correction form state
+  const [correctionRemarks, setCorrectionRemarks] = useState("");
+  const [correctionFile, setCorrectionFile] = useState<File | null>(null);
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
+  const correctionFileRef = useRef<HTMLInputElement>(null);
 
   // Modal states
   const [showMetadataModal, setShowMetadataModal] = useState(false);
@@ -79,6 +88,8 @@ export default function ArticleDetail() {
         const versions = await fetchGalleyVersionsForManuscript(id);
         if (versions.length > 0) {
           setLatestGalley(versions[0]); // versions are ordered DESC
+          const authorRev = versions.find(v => v.submitter_id === data.submitter_id);
+          setLatestAuthorRevision(authorRev || null);
         }
       }
       setLoading(false);
@@ -95,6 +106,8 @@ export default function ArticleDetail() {
       const versions = await fetchGalleyVersionsForManuscript(id);
       if (versions.length > 0) {
         setLatestGalley(versions[0]);
+        const authorRev = versions.find(v => v.submitter_id === data.submitter_id);
+        setLatestAuthorRevision(authorRev || null);
       }
     }
   };
@@ -233,10 +246,57 @@ export default function ArticleDetail() {
                   </div>
                 )}
 
+                {/* Author Correction Input Area */}
+                <div className="mt-6 mb-4">
+                  <h4 className="font-['Newsreader',serif] text-[16px] text-[#1a1c1c] mb-2">
+                    Request Corrections
+                  </h4>
+                  <p className="text-xs text-[#6b7280] font-['Public_Sans',sans-serif] mb-3">
+                    If you need to request corrections, please provide remarks and upload the corrected file.
+                  </p>
+                  
+                  <textarea
+                    value={correctionRemarks}
+                    onChange={(e) => setCorrectionRemarks(e.target.value)}
+                    placeholder="Describe the corrections needed..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm font-['Public_Sans',sans-serif] focus:border-[#3f4b7e] focus:outline-none mb-3 resize-none"
+                  />
+
+                  <input
+                    ref={correctionFileRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => setCorrectionFile(e.target.files?.[0] ?? null)}
+                  />
+                  {correctionFile ? (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#e8eaf6] rounded-lg mb-3">
+                      <FileText className="size-4 text-[#3f4b7e]" />
+                      <span className="text-xs text-[#3f4b7e] font-['Public_Sans',sans-serif] flex-1 truncate">
+                        {correctionFile.name}
+                      </span>
+                      <button
+                        onClick={() => setCorrectionFile(null)}
+                        className="p-0.5 hover:bg-[#3f4b7e]/10 rounded"
+                      >
+                        <X className="size-3 text-[#3f4b7e]" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => correctionFileRef.current?.click()}
+                      className="flex items-center gap-2 px-3 py-3 text-xs font-['Public_Sans',sans-serif] text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-lg hover:border-[#3f4b7e] hover:text-[#3f4b7e] transition-colors w-full justify-center mb-3"
+                    >
+                      <Upload className="size-4" />
+                      Required: Upload corrected file
+                    </button>
+                  )}
+                </div>
+
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
-                    disabled={!latestGalley}
+                    disabled={!latestGalley || !!correctionFile || correctionRemarks.trim() !== ""}
                     onClick={async () => {
                       const success = await authorApproveGalley(manuscript.id);
                       if (success) await refetch();
@@ -247,15 +307,22 @@ export default function ArticleDetail() {
                     Sign-off &amp; Approve for Publication
                   </button>
                   <button
-                    disabled={!latestGalley}
+                    disabled={!latestGalley || !correctionFile || !correctionRemarks.trim() || submittingCorrection}
                     onClick={async () => {
-                      const success = await authorRequestCorrections(manuscript.id);
-                      if (success) await refetch();
+                      if (!correctionFile || !correctionRemarks.trim()) return;
+                      setSubmittingCorrection(true);
+                      const success = await authorRequestCorrections(manuscript.id, correctionFile, correctionRemarks);
+                      setSubmittingCorrection(false);
+                      if (success) {
+                        setCorrectionFile(null);
+                        setCorrectionRemarks("");
+                        await refetch();
+                      }
                     }}
                     className="flex items-center gap-2 px-5 py-3 bg-white border border-[#e0e0e0] text-[#6b7280] text-sm font-['Public_Sans',sans-serif] rounded-lg hover:border-[#e65100] hover:text-[#e65100] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RotateCcw className="size-4" />
-                    Request Corrections
+                    {submittingCorrection ? "Uploading..." : "Request Corrections"}
                   </button>
                 </div>
               </div>
@@ -265,7 +332,7 @@ export default function ArticleDetail() {
       })()}
 
       {/* Main Workflow Container */}
-      <main className="px-8 py-12">
+      <main className="px-8 py-12 pb-32">
         {/* Workflow Title */}
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-4">
@@ -290,7 +357,7 @@ export default function ArticleDetail() {
               <div className="w-16" />
               <div className="flex-1 bg-white rounded-lg shadow-sm border border-[#e0e0e0] p-6">
                 <ManuscriptPdfViewer
-                  fileUrl={manuscript.file_url}
+                  fileUrl={latestAuthorRevision ? latestAuthorRevision.file_url : manuscript.file_url}
                   title={`${manuscript.title} manuscript PDF`}
                 />
               </div>

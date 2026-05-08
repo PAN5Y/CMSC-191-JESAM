@@ -29,12 +29,14 @@ export default function ReadinessChecklist({
     {
       label: "Files Ready (PDF)",
       done: readiness.filesReady,
-      subtitle: readiness.filesReady ? manuscript.file_url?.split("/").pop() : undefined,
-      action: {
-        label: readiness.filesReady ? "Replace File" : "Upload File",
-        icon: Upload,
-        onClick: onUploadFile,
-      },
+      subtitle: readiness.filesReady ? (manuscript.file_url?.split("/").pop() || "Initial submission file") : undefined,
+      action: !readiness.filesReady
+        ? {
+            label: "Upload File",
+            icon: Upload,
+            onClick: onUploadFile,
+          }
+        : undefined,
     },
     {
       label: "DOI Assigned",
@@ -76,7 +78,7 @@ export default function ReadinessChecklist({
         </h4>
         <div className="space-y-3">
           {checklistItems.map((item) => {
-            const ActionIcon = item.action.icon;
+            const ActionIcon = item.action?.icon;
             return (
               <div
                 key={item.label}
@@ -99,7 +101,7 @@ export default function ReadinessChecklist({
                     )}
                   </div>
                 </div>
-                {!isAuthor && (
+                {!isAuthor && item.action && ActionIcon && (
                   <button
                     onClick={item.action.onClick}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#3f4b7e] hover:bg-[#e8eaf6] rounded transition-colors font-['Public_Sans',sans-serif]"

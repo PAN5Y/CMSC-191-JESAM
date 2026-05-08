@@ -129,6 +129,9 @@ export default function PublishAction({
     );
   }
 
+  const needsIssueAssignment = manuscript.status === "In Issue Management" && !manuscript.issue_assignment;
+  const isPublishDisabled = !readiness.isReady || isPublishing || needsIssueAssignment;
+
   // Pre-publish state
   return (
     <div className="bg-gradient-to-r from-[#3f4b7e] to-[#5a67a3] rounded-lg shadow-lg p-8 text-white">
@@ -138,11 +141,13 @@ export default function PublishAction({
             Ready to Publish
           </h3>
           <p className="text-white/80 font-['Public_Sans',sans-serif]">
-            {readiness.isReady
+            {readiness.isReady && !needsIssueAssignment
               ? "All requirements met — Click to publish"
+              : needsIssueAssignment
+              ? "Please assign an issue before publishing."
               : "Complete all requirements above to enable publication"}
           </p>
-          {readiness.isReady && (
+          {readiness.isReady && !needsIssueAssignment && (
             <p className="text-white/60 font-['Public_Sans',sans-serif] text-xs mt-2">
               Publishing will: update status, open UKDR deposit, and download XML metadata
             </p>
@@ -150,9 +155,9 @@ export default function PublishAction({
         </div>
         <button
           onClick={handlePublish}
-          disabled={!readiness.isReady || isPublishing}
+          disabled={isPublishDisabled}
           className={`px-8 py-4 rounded-lg font-['Public_Sans',sans-serif] text-[18px] transition-all ${
-            !readiness.isReady
+            isPublishDisabled
               ? "bg-white/20 text-white/60 cursor-not-allowed"
               : "bg-[#F5C344] text-[#3f4b7e] hover:bg-[#F5C344]/90 shadow-xl cursor-pointer hover:scale-105"
           }`}

@@ -86,7 +86,7 @@ export default function PublicationDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="px-8 py-8">
+      <main className="px-8 py-8 pb-32">
         {/* Stage summary counters */}
         <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 mb-6">
           {statusTabs.map((tab) => {
