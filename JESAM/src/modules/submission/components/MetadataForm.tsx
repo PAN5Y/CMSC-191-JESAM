@@ -1,13 +1,86 @@
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, X, Wand2, Loader2 } from "lucide-react";
 import { useSubmissionWizard } from "../context/SubmissionWizardContext";
+import { supabase } from "@/lib/supabase";
+import { useState } from "react";
 
 const focusOptions = ["Land", "Air", "Water", "People"] as const;
 
 export function MetadataForm() {
   const { metadata, setMetadata } = useSubmissionWizard();
+  const [inputValue, setInputValue] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleChange = (field: keyof typeof metadata, value: string) => {
     setMetadata((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const MAX_KEYWORDS = 6;
+  const MIN_KEYWORDS = 3;
+
+  const currentKeywords = metadata.keywords 
+    ? metadata.keywords.split(',').map(k => k.trim()).filter(k => k !== "") 
+    : [];
+
+    const addKeyword = (word: string) => {
+      const trimmed = word.trim();
+
+      if (currentKeywords.includes(trimmed)) {
+        setInputValue("");
+        return;
+      }
+
+      if (currentKeywords.length >= MAX_KEYWORDS) {
+        alert(`Manuscripts typically accept a maximum of ${MAX_KEYWORDS} keywords.`);
+        return;
+      }
+
+      if (trimmed) {
+        const newKeywords = [...currentKeywords, trimmed].join(', ');
+        handleChange("keywords", newKeywords);
+      }
+      setInputValue("");
+  };
+
+  const removeKeyword = (wordToRemove: string) => {
+    const newKeywords = currentKeywords
+      .filter((k) => k !== wordToRemove)
+      .join(', ');
+    handleChange("keywords", newKeywords);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addKeyword(inputValue);
+    }
+  };
+
+  // --- AI GENERATION LOGIC ---
+  const generateAIKeywords = async () => {
+    if (!metadata.abstract || metadata.abstract.length < 50) {
+      alert("Please provide a longer abstract first.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-keywords', {
+        body: { abstractText: metadata.abstract }
+      });
+
+      if (error) throw error;
+
+      const aiResults = (data.keywords || []).slice(0, MAX_KEYWORDS);
+      
+      // Merge with existing keywords, avoiding duplicates
+      const combined = Array.from(new Set([...currentKeywords, ...aiResults])).slice(0, MAX_KEYWORDS);      
+      console.log("AI-generated keywords:", aiResults);
+      handleChange("keywords", combined.join(', '));
+    } catch (err) {
+      console.error("AI Generation failed:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -48,7 +121,7 @@ export function MetadataForm() {
         <p className="mt-1 text-sm text-gray-500">{metadata.abstract.length} characters</p>
       </div>
 
-      <div>
+      {/* <div>
         <label htmlFor="keywords" className="block text-sm font-medium text-gray-700 mb-2">
           Keywords <span className="text-red-500">*</span>
         </label>
@@ -61,6 +134,54 @@ export function MetadataForm() {
           className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow"
         />
         <p className="mt-1 text-sm text-gray-500">Separate keywords with commas</p>
+      </div> */}
+
+      {/* KEYWORDS SECTION */}
+      <div>
+        <div className="flex justify-between items-end mb-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Keywords <span className="text-red-500">*</span>
+            <span className="ml-2 text-xs font-normal text-gray-400">
+              ({currentKeywords.length}/{MAX_KEYWORDS})
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={generateAIKeywords}
+            disabled={isGenerating || currentKeywords.length >= MAX_KEYWORDS}
+            className="flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:text-gray-300"
+          >
+            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+            Suggest Keywords
+          </button>
+        </div>
+
+        <div className={`min-h-[46px] p-1.5 w-full border rounded-lg flex flex-wrap gap-2 bg-white transition-all ${
+          currentKeywords.length >= MAX_KEYWORDS ? 'bg-gray-50 border-gray-200' : 'border-gray-300 focus-within:ring-2 focus-within:ring-blue-500'
+        }`}>
+          {currentKeywords.map((word) => (
+            <span key={word} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-md border border-blue-200">
+              {word}
+              <button type="button" onClick={() => removeKeyword(word)} className="hover:bg-blue-200 rounded-full p-0.5">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+
+          {currentKeywords.length < MAX_KEYWORDS && (
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={currentKeywords.length === 0 ? "Type and press Enter..." : "Add more..."}
+              className="flex-1 min-w-[150px] outline-none text-sm py-1 px-1 bg-transparent"
+            />
+          )}
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          Press Enter to add each keyword. Max {MAX_KEYWORDS} allowed.
+        </p>
       </div>
 
       <div>
