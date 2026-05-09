@@ -88,18 +88,12 @@ function validateAuthors(list: Author[]): boolean {
     (a) =>
       a.name.trim().length > 0 &&
       a.email.trim().length > 0 &&
-      (a.orcid ?? "").trim().length > 0 &&
       a.affiliation.trim().length > 0
   );
 }
 
-function validateChecks(c: AutomatedCheckResult, hasFile: boolean): boolean {
-  if (!hasFile) return false;
-  return (
-    c.formatting.status === "passed" &&
-    c.assets.status === "passed" &&
-    c.plagiarism.status === "passed"
-  );
+function validateChecks(_c: AutomatedCheckResult, hasFile: boolean): boolean {
+  return hasFile;
 }
 
 function validateDeclarations(d: AdministrativeDeclarations): boolean {

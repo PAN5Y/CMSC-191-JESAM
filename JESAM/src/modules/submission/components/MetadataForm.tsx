@@ -20,6 +20,10 @@ export function MetadataForm() {
   const currentKeywords = metadata.keywords 
     ? metadata.keywords.split(',').map(k => k.trim()).filter(k => k !== "") 
     : [];
+  const canSuggestKeywords =
+    metadata.title.trim().length > 0 &&
+    metadata.abstract.trim().length > 0 &&
+    currentKeywords.length < MAX_KEYWORDS;
 
     const addKeyword = (word: string) => {
       const trimmed = word.trim();
@@ -57,27 +61,34 @@ export function MetadataForm() {
 
   // --- AI GENERATION LOGIC ---
   const generateAIKeywords = async () => {
-    if (!metadata.abstract || metadata.abstract.length < 50) {
-      alert("Please provide a longer abstract first.");
+    if (!metadata.title.trim() || !metadata.abstract.trim()) {
+      alert("Please provide both a title and an abstract first.");
       return;
     }
 
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-keywords', {
-        body: { abstractText: metadata.abstract }
+        body: {
+          title: metadata.title,
+          abstractText: metadata.abstract,
+        }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      const aiResults = (data.keywords || []).slice(0, MAX_KEYWORDS);
+      const aiResults = (data.keywords || [])
+        .map((k: unknown) => String(k).trim())
+        .filter(Boolean)
+        .slice(0, MAX_KEYWORDS);
       
       // Merge with existing keywords, avoiding duplicates
       const combined = Array.from(new Set([...currentKeywords, ...aiResults])).slice(0, MAX_KEYWORDS);      
-      console.log("AI-generated keywords:", aiResults);
       handleChange("keywords", combined.join(', '));
     } catch (err) {
       console.error("AI Generation failed:", err);
+      alert(err instanceof Error ? err.message : "Keyword suggestion failed.");
     } finally {
       setIsGenerating(false);
     }
@@ -148,8 +159,9 @@ export function MetadataForm() {
           <button
             type="button"
             onClick={generateAIKeywords}
-            disabled={isGenerating || currentKeywords.length >= MAX_KEYWORDS}
-            className="flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:text-gray-300"
+            disabled={isGenerating || !canSuggestKeywords}
+            title={!metadata.title.trim() || !metadata.abstract.trim() ? "Enter both title and abstract first" : undefined}
+            className="flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:text-gray-300 disabled:cursor-not-allowed"
           >
             {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
             Suggest Keywords
@@ -180,7 +192,7 @@ export function MetadataForm() {
           )}
         </div>
         <p className="mt-1 text-xs text-gray-500">
-          Press Enter to add each keyword. Max {MAX_KEYWORDS} allowed.
+          Press Enter to add each keyword. Suggestions require both title and abstract. Max {MAX_KEYWORDS} allowed.
         </p>
       </div>
 

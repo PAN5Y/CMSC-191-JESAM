@@ -1,8 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { SubmissionsTable } from '../components/SubmissionsTable';
 import { useSubmissions } from '../hooks/useSubmissions';
-import { Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, FileText, Plus, XCircle } from 'lucide-react';
+import type { Manuscript, ManuscriptStatus } from '@/types';
+import { getAuthorDecisionFeedback } from '@/lib/manuscript-feedback';
+
+const AUTHOR_ACTION_STATUSES = new Set<ManuscriptStatus>([
+  "For Format Revision",
+  "Revision Requested",
+  "Returned to Author",
+  "Return to Revision",
+]);
+
+function pct(part: number, whole: number) {
+  if (!whole) return "0%";
+  return `${Math.round((part / whole) * 100)}%`;
+}
+
+function daysSince(date: string) {
+  const diff = Date.now() - new Date(date).getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function statusCount(manuscripts: Manuscript[], statuses: ManuscriptStatus[]) {
+  return manuscripts.filter((m) => statuses.includes(m.status)).length;
+}
 
 export default function SubmissionDashboard() {
   const navigate = useNavigate();
@@ -16,23 +39,55 @@ export default function SubmissionDashboard() {
     navigate('/author/submit');
   };
 
+  const dashboard = useMemo(() => {
+    const total = manuscripts.length;
+    const needsAction = manuscripts.filter((m) => AUTHOR_ACTION_STATUSES.has(m.status));
+    const active = manuscripts.filter(
+      (m) => !["Rejected", "Published", "Retracted"].includes(m.status)
+    );
+    const published = manuscripts.filter((m) => m.status === "Published");
+    const rejected = manuscripts.filter((m) => m.status === "Rejected");
+    const inReview = manuscripts.filter((m) => m.status === "Peer Review");
+    const rejectedWithFeedback = rejected.filter((m) => getAuthorDecisionFeedback(m)?.comments);
+    const newest = [...manuscripts]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 3);
+    const oldestActive = [...active]
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
+
+    return {
+      total,
+      needsAction,
+      active,
+      published,
+      rejected,
+      rejectedWithFeedback,
+      inReview,
+      newest,
+      oldestActive,
+      intake: statusCount(manuscripts, ["Initial Screening", "Production Checks", "For Format Revision"]),
+      review: statusCount(manuscripts, ["Peer Review", "Revision Requested"]),
+      production: statusCount(manuscripts, ["Accepted", "In Production"]),
+    };
+  }, [manuscripts]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Submissions</h1>
-              <p className="text-gray-600 mt-1">
-                Track your manuscripts from submission through format verification, EIC screening,
-                and peer review
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Submissions</h1>
+              <p className="text-sm sm:text-base text-gray-600 mt-1 max-w-2xl">
+                Track your manuscripts from submission through initial screening, production
+                checks, and peer review
               </p>
             </div>
             <button
               type="button"
               onClick={handleNewSubmission}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-5 h-5" />
               New Submission
@@ -57,11 +112,190 @@ export default function SubmissionDashboard() {
             <p className="mt-4 text-gray-600">Loading your submissions...</p>
           </div>
         ) : manuscripts.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-lg border border-gray-200 p-6 sm:p-12 text-center">
             <p className="text-gray-600 mb-4">You haven't submitted any manuscripts yet</p>
           </div>
         ) : (
-          <SubmissionsTable manuscripts={manuscripts} onNewSubmission={handleNewSubmission} />
+          <div className="space-y-8">
+            <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[
+                {
+                  label: "Total manuscripts",
+                  value: dashboard.total,
+                  detail: `${dashboard.active.length} active`,
+                  icon: FileText,
+                  tone: "text-blue-700 bg-blue-50 border-blue-100",
+                },
+                {
+                  label: "Needs your action",
+                  value: dashboard.needsAction.length,
+                  detail: "Revision or response required",
+                  icon: AlertCircle,
+                  tone: "text-gray-900 bg-white border-gray-200",
+                  iconTone: "text-amber-600 bg-amber-50",
+                },
+                {
+                  label: "Published",
+                  value: dashboard.published.length,
+                  detail: `${pct(dashboard.published.length, dashboard.total)} of submissions`,
+                  icon: CheckCircle2,
+                  tone: "text-green-700 bg-green-50 border-green-100",
+                },
+                {
+                  label: "Rejected",
+                  value: dashboard.rejected.length,
+                  detail: `${pct(dashboard.rejected.length, dashboard.total)} of submissions`,
+                  icon: XCircle,
+                  tone: "text-gray-900 bg-white border-gray-200",
+                  iconTone: "text-red-600 bg-red-50",
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className={`rounded-lg border p-4 ${item.tone}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{item.label}</p>
+                        <p className="text-3xl font-bold mt-1">{item.value}</p>
+                        <p className="text-xs mt-1 text-gray-500">{item.detail}</p>
+                      </div>
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                          item.iconTone ?? "text-current bg-white/50"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+
+            <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-5 xl:col-span-2">
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Progress overview</h2>
+                    <p className="text-sm text-gray-600">Where your manuscripts are right now.</p>
+                  </div>
+                  {dashboard.oldestActive && (
+                    <div className="hidden sm:flex items-center gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-full px-3 py-1">
+                      <Clock3 className="w-3.5 h-3.5" />
+                      Oldest active: {daysSince(dashboard.oldestActive.created_at)} days
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    ["Intake and checks", dashboard.intake, "Initial screening, production checks, format revision"],
+                    ["Peer review", dashboard.review, "Reviewer assignment, review, revision decisions"],
+                    ["Publication", dashboard.production, "Accepted or in production"],
+                  ].map(([label, value, detail]) => (
+                    <div key={label} className="rounded-lg border border-gray-200 p-4">
+                      <p className="text-sm font-medium text-gray-900">{label}</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+                      <p className="text-xs text-gray-500 mt-1">{detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h2 className="font-semibold text-gray-900">Recent submissions</h2>
+                <div className="mt-3 space-y-3">
+                  {dashboard.newest.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => navigate(`/author/article/${m.id}`)}
+                      className="w-full text-left rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+                    >
+                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{m.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {m.reference_code ?? m.id.slice(0, 8)} - {m.status}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {dashboard.needsAction.length > 0 && (
+              <section className="bg-white border border-gray-200 rounded-lg p-5">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Needs your action</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Manuscripts waiting for your revision or response.
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                    {dashboard.needsAction.length} pending
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {dashboard.needsAction.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => navigate("/revision")}
+                      className="text-left rounded-lg border border-gray-200 p-4 hover:border-amber-200 hover:bg-amber-50/40"
+                    >
+                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{m.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {m.reference_code ?? m.id.slice(0, 8)} - {m.status}
+                      </p>
+                      {m.submission_metadata?.production_decision_comments && (
+                        <p className="text-xs text-gray-600 mt-2 line-clamp-2">
+                          {m.submission_metadata.production_decision_comments}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {dashboard.rejectedWithFeedback.length > 0 && (
+              <section className="bg-white border border-gray-200 rounded-lg p-5">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Rejected manuscripts feedback</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Decision notes from editorial screening or production checks.
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
+                    {dashboard.rejectedWithFeedback.length} with feedback
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {dashboard.rejectedWithFeedback.map((m) => {
+                    const feedback = getAuthorDecisionFeedback(m);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => navigate(`/author/article/${m.id}`)}
+                        className="text-left rounded-lg border border-gray-200 p-4 hover:border-red-200 hover:bg-red-50/30"
+                      >
+                        <p className="text-sm font-medium text-gray-900 line-clamp-1">{m.title}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {m.reference_code ?? m.id.slice(0, 8)} - {feedback?.source}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-2 line-clamp-3 whitespace-pre-wrap">
+                          {feedback?.comments}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            <SubmissionsTable manuscripts={manuscripts} onNewSubmission={handleNewSubmission} />
+          </div>
         )}
       </div>
     </div>

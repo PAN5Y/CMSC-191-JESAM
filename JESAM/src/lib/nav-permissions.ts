@@ -4,6 +4,7 @@ import {
   Users,
   Edit,
   FileCheck,
+  ClipboardCheck,
   BookOpen,
   BarChart3,
   HelpCircle,
@@ -42,11 +43,28 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
     ];
   }
 
-  if (role === "associate_editor" || role === "managing_editor") {
+  if (role === "technical_editor") {
+    return [
+      { icon: Users, label: "Peer Review", to: "/peer-review" },
+      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
+      { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
+    ];
+  }
+
+  if (role === "associate_editor") {
     return [
       { icon: Upload, label: "Submission", to: "/submission/queue" },
-      { icon: Users, label: "Peer Review", to: "/peer-review" },
       { icon: Edit, label: "Revision", to: "/revision" },
+      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
+      { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
+    ];
+  }
+
+  if (role === "managing_editor") {
+    return [
+      { icon: Upload, label: "Screening", to: "/submission/screening" },
       { icon: BookOpen, label: "Browse journals", to: "/browse" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
@@ -56,8 +74,6 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
   if (role === "editor_in_chief") {
     return [
       { icon: Upload, label: "Submission", to: "/submission/screening" },
-      { icon: Users, label: "Peer Review", to: "/peer-review" },
-      { icon: Edit, label: "Revision", to: "/revision" },
       { icon: BookOpen, label: "Browse journals", to: "/browse" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
@@ -66,6 +82,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
 
   if (role === "production_editor") {
     return [
+      { icon: ClipboardCheck, label: "Pre-review Checks", to: "/production/pre-review" },
       { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
       { icon: BookOpen, label: "Browse journals", to: "/browse" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
@@ -78,6 +95,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
     { icon: Upload, label: "Submission", to: "/submission/queue" },
     { icon: Users, label: "Peer Review", to: "/peer-review" },
     { icon: Edit, label: "Revision", to: "/revision" },
+    { icon: ClipboardCheck, label: "Pre-review Checks", to: "/production/pre-review" },
     { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
     { icon: BookOpen, label: "Browse journals", to: "/browse" },
     { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },

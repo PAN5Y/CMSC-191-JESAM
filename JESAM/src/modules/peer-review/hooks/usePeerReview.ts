@@ -239,7 +239,7 @@ export function usePeerReview() {
           {
             notifications: appendNotification(manuscript, {
               type: 'review-submitted',
-              recipientRole: 'associate_editor',
+              recipientRole: 'technical_editor',
               message: `A review was submitted for ${manuscript.reference_code ?? manuscript.id}.`,
             }),
             audit_logs: appendAudit(
@@ -264,7 +264,7 @@ export function usePeerReview() {
           peer_review: peerReview,
           notifications: appendNotification(manuscript, {
             type: 'review-submitted',
-            recipientRole: 'associate_editor',
+            recipientRole: 'technical_editor',
             message: `A review was submitted for ${manuscript.reference_code ?? manuscript.id}.`,
           }),
           audit_logs: appendAudit(manuscript, 'reviewer', 'review-submitted', input.recommendation),

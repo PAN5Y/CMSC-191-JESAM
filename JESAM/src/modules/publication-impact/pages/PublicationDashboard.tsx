@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useManuscripts } from "../hooks/useManuscripts";
 import ManuscriptTable from "../components/ManuscriptTable";
@@ -25,6 +25,18 @@ export default function PublicationDashboard() {
     activeTab === "all"
       ? manuscripts
       : manuscripts.filter((m) => m.status === activeTab);
+
+  const dashboard = useMemo(() => {
+    const accepted = manuscripts.filter((m) => m.status === "Accepted");
+    const inProduction = manuscripts.filter((m) => m.status === "In Production");
+    const published = manuscripts.filter((m) => m.status === "Published");
+    const needsDoi = manuscripts.filter((m) => !m.doi && m.status !== "Published");
+    const needsFile = manuscripts.filter((m) => !m.file_url);
+    const readyToPublish = manuscripts.filter(
+      (m) => m.title && m.authors.length > 0 && m.keywords.length > 0 && m.file_url && m.doi
+    );
+    return { accepted, inProduction, published, needsDoi, needsFile, readyToPublish };
+  }, [manuscripts]);
 
   return (
     <>
@@ -58,6 +70,47 @@ export default function PublicationDashboard() {
 
       {/* Main Content */}
       <main className="px-8 py-8">
+        {!isAuthor && (
+          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4 mb-8">
+            {[
+              ["Accepted", dashboard.accepted.length, "Awaiting production"],
+              ["In production", dashboard.inProduction.length, "Being prepared"],
+              ["Ready to publish", dashboard.readyToPublish.length, "Metadata, file, DOI ready"],
+              ["Needs DOI", dashboard.needsDoi.length, "DOI not assigned"],
+              ["Needs file", dashboard.needsFile.length, "Missing manuscript file"],
+              ["Published", dashboard.published.length, "Live articles"],
+            ].map(([label, value, detail]) => (
+              <div key={label} className="bg-white rounded-lg border border-[#e0e0e0] p-4">
+                <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">{label}</p>
+                <p className="text-3xl font-bold text-[#1a1c1c] mt-1">{value}</p>
+                <p className="text-xs text-[#9e9e9e] mt-1">{detail}</p>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {!isAuthor && (dashboard.needsDoi.length > 0 || dashboard.needsFile.length > 0) && (
+          <section className="bg-amber-50 border border-amber-200 rounded-lg p-5 mb-8">
+            <h3 className="font-semibold text-amber-950">Production attention needed</h3>
+            <p className="text-sm text-amber-900 mt-1">
+              Prioritize manuscripts with missing DOI or file readiness before publication.
+            </p>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[...dashboard.needsDoi, ...dashboard.needsFile]
+                .filter((m, index, arr) => arr.findIndex((x) => x.id === m.id) === index)
+                .slice(0, 4)
+                .map((m) => (
+                  <div key={m.id} className="bg-white/80 rounded-lg border border-amber-200 p-3">
+                    <p className="text-sm font-medium text-amber-950 line-clamp-1">{m.title}</p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      {m.reference_code ?? m.id.slice(0, 8)} - {!m.doi ? "Needs DOI" : "Needs file"}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </section>
+        )}
+
         {/* Status filter tabs */}
         <div className="flex items-center gap-2 mb-6">
           {statusTabs.map((tab) => (

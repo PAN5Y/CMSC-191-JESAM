@@ -29,6 +29,7 @@ import ArticlePreviewModal from "../components/ArticlePreviewModal";
 import MetadataExportModal from "../components/MetadataExportModal";
 import ManuscriptPdfViewer from "@/components/common/ManuscriptPdfViewer";
 import type { Manuscript } from "../types";
+import { getAuthorDecisionFeedback } from "@/lib/manuscript-feedback";
 
 export default function ArticleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -115,6 +116,7 @@ export default function ArticleDetail() {
 
   const readiness = getReadinessStatus(manuscript);
   const isPublished = manuscript.status === "Published";
+  const authorFeedback = getAuthorDecisionFeedback(manuscript);
 
   return (
     <>
@@ -167,6 +169,46 @@ export default function ArticleDetail() {
 
         {/* Workflow Steps */}
         <div className="relative">
+          {isAuthor && authorFeedback && (
+            <div className="relative mb-8">
+              <div className="flex items-start gap-6">
+                <div className="relative z-10 flex items-center justify-center size-16 bg-red-50 rounded-full border-4 border-white shadow-md">
+                  <AlertCircle className="size-7 text-red-700" />
+                </div>
+                <div className="flex-1">
+                  <div className="bg-white rounded-lg shadow-sm border border-red-200 p-6">
+                    <p className="text-xs uppercase tracking-wide text-red-700 font-['Public_Sans',sans-serif]">
+                      {authorFeedback.source}
+                    </p>
+                    <h3 className="font-['Newsreader',serif] text-[24px] text-[#1a1c1c] leading-[32px] mt-1">
+                      {authorFeedback.heading}
+                    </h3>
+                    {authorFeedback.reason && (
+                      <p className="text-sm text-red-900 font-['Public_Sans',sans-serif] mt-3">
+                        Reason: {authorFeedback.reason}
+                      </p>
+                    )}
+                    {authorFeedback.comments && (
+                      <p className="text-sm text-[#1a1c1c] font-['Public_Sans',sans-serif] whitespace-pre-wrap mt-3">
+                        {authorFeedback.comments}
+                      </p>
+                    )}
+                    {authorFeedback.checkSummary && (
+                      <div className="mt-4 rounded-lg border border-red-100 bg-red-50 p-3">
+                        <p className="text-xs uppercase tracking-wide text-red-700 font-['Public_Sans',sans-serif] mb-2">
+                          Production check results
+                        </p>
+                        <p className="text-sm text-red-950 whitespace-pre-wrap font-['Public_Sans',sans-serif]">
+                          {authorFeedback.checkSummary}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="relative mb-8">
             <div className="flex items-start gap-6">
               <div className="w-16" />

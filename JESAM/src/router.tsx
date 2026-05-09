@@ -5,6 +5,7 @@ import LoginPage from "./modules/auth/LoginPage";
 import RegisterPage from "./modules/auth/RegisterPage";
 import UnauthorizedPage from "./components/auth/UnauthorizedPage";
 import PublicationDashboard from "./modules/publication-impact/pages/PublicationDashboard";
+import ProductionPreReviewDashboard from "./modules/production/pages/ProductionPreReviewDashboard";
 import ArticleDetail from "./modules/publication-impact/pages/ArticleDetail";
 import PublicArticlePage from "./modules/publication-impact/pages/PublicArticlePage";
 import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard";
@@ -72,6 +73,7 @@ export const router = createBrowserRouter([
       <ProtectedRoute
         allowedRoles={[
           "production_editor",
+          "technical_editor",
           "reviewer",
           "managing_editor",
           "associate_editor",
@@ -98,7 +100,7 @@ export const router = createBrowserRouter([
     path: "/submission/queue",
     element: (
       <ProtectedRoute
-        allowedRoles={["associate_editor", "managing_editor", "system_admin"]}
+        allowedRoles={["associate_editor", "system_admin"]}
       />
     ),
     children: [
@@ -112,7 +114,7 @@ export const router = createBrowserRouter([
   // ── EIC screening ──
   {
     path: "/submission/screening",
-    element: <ProtectedRoute allowedRoles={["editor_in_chief", "system_admin"]} />,
+    element: <ProtectedRoute allowedRoles={["editor_in_chief", "managing_editor", "system_admin"]} />,
     children: [
       {
         element: <AppLayout />,
@@ -122,6 +124,21 @@ export const router = createBrowserRouter([
   },
 
   // ── Publication / Production routes ──
+  {
+    path: "/production/pre-review",
+    element: (
+      <ProtectedRoute
+        allowedRoles={["production_editor", "technical_editor", "system_admin"]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <ProductionPreReviewDashboard /> }],
+      },
+    ],
+  },
+
   {
     path: "/publication/dashboard",
     element: <ProtectedRoute allowedRoles={["production_editor", "system_admin"]} />,
@@ -138,7 +155,7 @@ export const router = createBrowserRouter([
     path: "/peer-review",
     element: (
       <ProtectedRoute
-        allowedRoles={["associate_editor", "managing_editor", "editor_in_chief", "system_admin"]}
+        allowedRoles={["technical_editor", "system_admin"]}
       />
     ),
     children: [
@@ -166,7 +183,7 @@ export const router = createBrowserRouter([
     path: "/revision",
     element: (
       <ProtectedRoute
-        allowedRoles={["author", "associate_editor", "managing_editor", "editor_in_chief", "system_admin"]}
+        allowedRoles={["author", "technical_editor", "production_editor", "system_admin"]}
       />
     ),
     children: [
@@ -182,7 +199,7 @@ export const router = createBrowserRouter([
     path: "/analytics",
     element: (
       <ProtectedRoute
-        allowedRoles={["associate_editor", "managing_editor", "production_editor", "editor_in_chief", "system_admin"]}
+        allowedRoles={["associate_editor", "managing_editor", "technical_editor", "production_editor", "editor_in_chief", "system_admin"]}
       />
     ),
     children: [
@@ -204,6 +221,7 @@ export const router = createBrowserRouter([
           "associate_editor",
           "managing_editor",
           "production_editor",
+          "technical_editor",
           "editor_in_chief",
           "system_admin",
         ]}
@@ -227,6 +245,7 @@ export const router = createBrowserRouter([
           "managing_editor",
           "reviewer",
           "production_editor",
+          "technical_editor",
           "editor_in_chief",
           "system_admin",
         ]}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Users, CheckCircle2 } from 'lucide-react';
+import { X, Users } from 'lucide-react';
 import type { Manuscript } from '@/types';
 import ManuscriptPdfViewer from '@/components/common/ManuscriptPdfViewer';
 import { ScreeningDecisionModal, type ScreeningManuscriptSummary } from './ScreeningDecisionModal';
@@ -10,17 +10,6 @@ interface ManuscriptDetailsModalProps {
   decidedBy: string;
   onClose: () => void;
   onSubmitScreening: (decision: ScreeningDecision) => Promise<void>;
-}
-
-function formattingPassed(m: Manuscript): boolean {
-  const st = m.submission_metadata?.automated_checks?.formatting?.status;
-  return st === 'passed';
-}
-
-function similarityPercent(m: Manuscript): number {
-  const s = m.submission_metadata?.similarity_score;
-  if (typeof s === 'number' && !Number.isNaN(s)) return s;
-  return 0;
 }
 
 export function ManuscriptDetailsModal({
@@ -34,7 +23,6 @@ export function ManuscriptDetailsModal({
   const refLabel = manuscript.reference_code ?? manuscript.id.slice(0, 8).toUpperCase();
   const authorsDisplay = manuscript.authors.join(', ');
   const cls = manuscript.classification ?? '—';
-  const sim = similarityPercent(manuscript);
 
   const getClassificationColor = (classification: string) => {
     switch (classification) {
@@ -49,12 +37,6 @@ export function ManuscriptDetailsModal({
       default:
         return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const getSimilarityBarColor = (similarity: number) => {
-    if (similarity <= 15) return 'bg-green-500';
-    if (similarity <= 30) return 'bg-yellow-500';
-    return 'bg-red-500';
   };
 
   const summary: ScreeningManuscriptSummary = {
@@ -125,38 +107,12 @@ export function ManuscriptDetailsModal({
             <p className="text-sm text-gray-700 leading-relaxed">{manuscript.abstract}</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Similarity score</h4>
-              <div className="space-y-2">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getSimilarityBarColor(sim)}`}
-                    style={{ width: `${Math.min(sim, 100)}%` }}
-                  />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">{sim}%</p>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Formatting (automated)</h4>
-              <div className="flex items-center gap-2">
-                {formattingPassed(manuscript) ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">Passed</span>
-                  </>
-                ) : (
-                  <>
-                    <X className="w-5 h-5 text-amber-600" />
-                    <span className="text-sm font-medium text-amber-700">
-                      Pending or not passed
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h4 className="text-sm font-semibold text-blue-950 mb-1">Production checks</h4>
+            <p className="text-sm text-blue-900">
+              Automated similarity and format checks have not run yet. They will be handled by the
+              Production Editor if this manuscript passes initial screening.
+            </p>
           </div>
         </div>
 

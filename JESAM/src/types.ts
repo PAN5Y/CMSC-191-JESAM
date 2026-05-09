@@ -4,8 +4,11 @@
  */
 
 export type ManuscriptStatus =
+  | "Initial Screening"
   | "Pending Format Verification"
   | "Editor In Chief Screening"
+  | "Production Checks"
+  | "For Format Revision"
   | "Peer Review"
   | "Revision Requested"
   | "Returned to Author"
@@ -30,6 +33,7 @@ export type AppRole =
   | "reviewer"
   | "associate_editor"
   | "managing_editor"
+  | "technical_editor"
   | "production_editor"
   | "editor_in_chief"
   | "system_admin";
@@ -74,6 +78,37 @@ export interface AutomatedCheckSnapshot {
   formatting: { status: string; message: string };
   assets: { status: string; message: string };
   plagiarism: { status: string; message: string };
+}
+
+export interface TemplateCheckIssue {
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+}
+
+export interface TemplateCheckReport {
+  passed: boolean;
+  score: number;
+  checkedAt: string;
+  templatePath: string;
+  requiredSections: Array<{ name: string; found: boolean; order: number | null }>;
+  headingSequence: string[];
+  figureCaptions: string[];
+  tableCaptions: string[];
+  imageCount: number;
+  wordCount: number;
+  substantiveWordCount?: number;
+  redTemplateHintsRemaining?: string[];
+  templateInstructionsRemaining?: string[];
+  formatting?: {
+    directFontSamples: number;
+    directSizeSamples: number;
+    directLineSpacingSamples: number;
+    timesNewRomanRatio: number;
+    size12Ratio: number;
+    doubleSpacingRatio: number;
+  };
+  issues: TemplateCheckIssue[];
 }
 
 export type ReviewerRecommendation =
@@ -161,6 +196,7 @@ export interface SubmissionMetadata {
   ethicalApprovals?: string;
   author_details?: SubmissionAuthorDetail[];
   automated_checks?: AutomatedCheckSnapshot;
+  template_check_report?: TemplateCheckReport;
   similarity_score?: number;
   declarations?: {
     noCompetingInterests?: boolean;
@@ -170,9 +206,12 @@ export interface SubmissionMetadata {
   };
   screening_comments?: string;
   rejection_reason?: string;
+  rejection_comments?: string;
   screening_decided_at?: string;
   screening_decided_by?: string;
   editor_verification_comments?: string;
+  production_decision_comments?: string;
+  production_check_summary?: string;
   peer_review?: {
     activeRound?: number;
     rounds: PeerReviewRound[];

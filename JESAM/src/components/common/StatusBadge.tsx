@@ -3,6 +3,11 @@ import type { ManuscriptStatus } from "@/types";
 const statusConfig: Partial<
   Record<ManuscriptStatus, { bg: string; text: string; label: string }>
 > = {
+  "Initial Screening": {
+    bg: "bg-[#fce4ec]",
+    text: "text-[#c2185b]",
+    label: "Initial Screening",
+  },
   "Pending Format Verification": {
     bg: "bg-[#e3f2fd]",
     text: "text-[#1565c0]",
@@ -12,6 +17,16 @@ const statusConfig: Partial<
     bg: "bg-[#fce4ec]",
     text: "text-[#c2185b]",
     label: "EIC Screening",
+  },
+  "Production Checks": {
+    bg: "bg-[#e0f2fe]",
+    text: "text-[#075985]",
+    label: "Production Checks",
+  },
+  "For Format Revision": {
+    bg: "bg-[#fff8e1]",
+    text: "text-[#f57f17]",
+    label: "For Format Revision",
   },
   "Peer Review": {
     bg: "bg-[#e8eaf6]",

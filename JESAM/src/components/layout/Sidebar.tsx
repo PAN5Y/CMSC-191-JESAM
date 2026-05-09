@@ -8,7 +8,7 @@ export default function Sidebar() {
   const navItems = getSidebarItems(role);
 
   return (
-    <aside className="w-64 bg-[#3f4b7e] text-white flex flex-col fixed h-screen z-40">
+    <aside className="w-full md:w-64 bg-[#3f4b7e] text-white flex flex-col md:fixed md:h-screen z-40">
       {/* Branding */}
       <div className="p-6 border-b border-white/10">
         <h1 className="font-['Newsreader',serif] text-[22px] text-white mb-1">JESAM</h1>
@@ -18,8 +18,8 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4">
-        <div className="space-y-1">
+      <nav className="flex-1 p-4 overflow-x-auto md:overflow-visible">
+        <div className="flex gap-2 md:block md:space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -27,7 +27,7 @@ export default function Sidebar() {
                 key={`${item.to}-${item.label}`}
                 to={item.to}
                 className={({ isActive }) =>
-                  `w-full flex items-center gap-3 px-4 py-3 rounded-lg font-['Public_Sans',sans-serif] text-sm transition-colors ${
+                  `shrink-0 md:w-full flex items-center gap-3 px-4 py-3 rounded-lg font-['Public_Sans',sans-serif] text-sm transition-colors ${
                     isActive
                       ? 'bg-[#F5C344] text-[#3f4b7e] font-medium'
                       : 'text-white/80 hover:bg-white/10'
@@ -43,7 +43,7 @@ export default function Sidebar() {
       </nav>
 
       {/* User info + Footer */}
-      <div className="p-4 border-t border-white/10 space-y-3">
+      <div className="hidden md:block p-4 border-t border-white/10 space-y-3">
         {/* Logged-in user */}
         {user && (
           <div className="px-4 py-3 bg-white/5 rounded-lg">

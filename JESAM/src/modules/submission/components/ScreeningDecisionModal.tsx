@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, XCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, XCircle, CheckCircle } from 'lucide-react';
 import type { ScreeningDecision, EditorDecision } from '../types';
 
 export interface ScreeningManuscriptSummary {
@@ -52,16 +52,6 @@ export function ScreeningDecisionModal({
     setSubmitting(true);
     try {
       await onSubmit(buildDecision('reject'));
-      onClose();
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleReturnToAuthor = async () => {
-    setSubmitting(true);
-    try {
-      await onSubmit(buildDecision('return-to-author'));
       onClose();
     } finally {
       setSubmitting(false);
@@ -122,7 +112,7 @@ export function ScreeningDecisionModal({
 
           <div>
             <label htmlFor="comments" className="block text-sm font-medium text-gray-900 mb-2">
-              Editor-in-Chief comments
+              Screening comments
             </label>
             <textarea
               id="comments"
@@ -134,7 +124,7 @@ export function ScreeningDecisionModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
             <button
               type="button"
               disabled={submitting}
@@ -148,21 +138,11 @@ export function ScreeningDecisionModal({
             <button
               type="button"
               disabled={submitting}
-              onClick={() => void handleReturnToAuthor()}
-              className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600 transition-colors disabled:opacity-50"
-            >
-              <AlertCircle className="w-6 h-6" />
-              <span className="text-sm">Return to author</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={submitting}
               onClick={() => void handleApprove()}
               className="flex flex-col items-center justify-center gap-2 px-4 py-4 bg-[#3d4a6b] text-white rounded-lg font-medium hover:bg-[#4a5875] transition-colors disabled:opacity-50"
             >
               <CheckCircle className="w-6 h-6" />
-              <span className="text-sm">Approve for peer review</span>
+              <span className="text-sm">Approve for production checks</span>
             </button>
           </div>
         </div>

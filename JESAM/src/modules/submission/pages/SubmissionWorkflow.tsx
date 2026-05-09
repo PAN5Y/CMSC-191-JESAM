@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { MetadataForm } from "../components/MetadataForm";
 import { AuthorInformation } from "../components/AuthorInformation";
-import { AutomatedChecks } from "../components/AutomatedChecks";
+import { ManuscriptUpload } from "../components/ManuscriptUpload";
 import { AdministrativeCheck } from "../components/AdministrativeCheck";
 import { SubmissionSuccess } from "../components/SubmissionSuccess";
 import { SubmissionWizardProvider, useSubmissionWizard } from "../context/SubmissionWizardContext";
@@ -34,7 +34,7 @@ function SubmissionWorkflowInner() {
   const steps = [
     { id: "metadata" as const, title: "Research Metadata", icon: FileText },
     { id: "authors" as const, title: "Author Information", icon: Users },
-    { id: "checks" as const, title: "Automated Checks", icon: CheckCircle2 },
+    { id: "checks" as const, title: "Manuscript Upload", icon: CheckCircle2 },
     { id: "admin" as const, title: "Author Declarations", icon: Shield },
   ];
 
@@ -148,7 +148,7 @@ function SubmissionWorkflowInner() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {currentStep === "metadata" && <MetadataForm />}
         {currentStep === "authors" && <AuthorInformation />}
-        {currentStep === "checks" && <AutomatedChecks />}
+        {currentStep === "checks" && <ManuscriptUpload />}
         {currentStep === "admin" && <AdministrativeCheck />}
         {currentStep === "success" && submitted && (
           <SubmissionSuccess

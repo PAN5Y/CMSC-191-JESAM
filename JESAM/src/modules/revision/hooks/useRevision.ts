@@ -22,6 +22,7 @@ export function manuscriptNeedsRevisionAction(m: Manuscript): boolean {
   return (
     m.status === "Revision Requested" ||
     m.status === "Returned to Author" ||
+    m.status === "For Format Revision" ||
     m.status === "Return to Revision"
   );
 }
@@ -36,7 +37,10 @@ export function manuscriptHasRevisionUploads(m: Manuscript): boolean {
  * Canonical lifecycle: Revision cycle → return to Peer Review → editorial staff coordinate reviewers → editorial decision (proposal / transcript).
  */
 export function manuscriptAwaitingEditorialReReviewAfterRevision(m: Manuscript): boolean {
-  return m.status === "Peer Review" && manuscriptHasRevisionUploads(m);
+  if (m.status !== "Peer Review") return false;
+  if (!manuscriptHasRevisionUploads(m)) return false;
+  const rounds = m.submission_metadata?.peer_review?.rounds ?? [];
+  return rounds.some((r) => r.editorDecision === "revise");
 }
 
 /**
@@ -121,8 +125,8 @@ export function useRevision() {
         authorNote: string;
         responseLetter?: string;
         file: File;
-        automatedChecks: AutomatedCheckSnapshot;
-        similarityScore: number;
+        automatedChecks?: AutomatedCheckSnapshot;
+        similarityScore?: number;
       }
     ) => {
       const uid = user?.id;
@@ -134,15 +138,18 @@ export function useRevision() {
         toast.error("Please upload a revised manuscript file.");
         return false;
       }
+      const isProductionFormatRevision = manuscript.status === "For Format Revision";
       const ac = payload.automatedChecks;
-      if (
-        !ac ||
-        ac.formatting.status !== "passed" ||
-        ac.assets.status !== "passed" ||
-        ac.plagiarism.status !== "passed"
-      ) {
-        toast.error("Automated checks must all pass before submitting a revision.");
-        return false;
+      if (!isProductionFormatRevision) {
+        if (
+          !ac ||
+          ac.formatting.status !== "passed" ||
+          ac.assets.status !== "passed" ||
+          ac.plagiarism.status !== "passed"
+        ) {
+          toast.error("Automated checks must all pass before submitting a revision.");
+          return false;
+        }
       }
 
       const revisionNumber = await getNextRevisionNumber(manuscript.id);
@@ -168,7 +175,9 @@ export function useRevision() {
       }
 
       let nextStatus: ManuscriptStatus = "Peer Review";
-      if (manuscript.status === "Returned to Author") {
+      if (isProductionFormatRevision) {
+        nextStatus = "Production Checks";
+      } else if (manuscript.status === "Returned to Author") {
         const hasPeerRounds = await manuscriptHasPeerReviewRoundsInDb(manuscript.id);
         if (!hasPeerRounds) nextStatus = "Pending Format Verification";
       }
@@ -177,6 +186,8 @@ export function useRevision() {
       const notifMessage =
         nextStatus === "Pending Format Verification"
           ? `Revised file submitted for ${ref}; queued for handling-editor format verification.`
+          : nextStatus === "Production Checks"
+            ? `Format revision submitted for ${ref}; queued for production checks.`
           : `Revision submitted for ${ref}.`;
 
       const prev = manuscript.submission_metadata ?? {};
@@ -187,11 +198,11 @@ export function useRevision() {
               rounds: [],
             }
           : undefined,
-        automated_checks: payload.automatedChecks,
-        similarity_score: payload.similarityScore,
+        automated_checks: isProductionFormatRevision ? undefined : payload.automatedChecks,
+        similarity_score: isProductionFormatRevision ? undefined : payload.similarityScore,
         notifications: appendNotification(manuscript, {
           type: "revision-submitted",
-          recipientRole: "associate_editor",
+          recipientRole: isProductionFormatRevision ? "production_editor" : "technical_editor",
           message: notifMessage,
         }),
         audit_logs: appendAudit(
@@ -199,10 +210,18 @@ export function useRevision() {
           "author",
           nextStatus === "Pending Format Verification"
             ? "intake-revision-submitted"
+            : nextStatus === "Production Checks"
+              ? "format-revision-submitted"
             : "revision-submitted",
           payload.authorNote
         ),
       });
+      delete nextMeta.template_check_report;
+      if (isProductionFormatRevision) {
+        delete nextMeta.automated_checks;
+        delete nextMeta.similarity_score;
+        delete nextMeta.production_check_summary;
+      }
 
       return save(manuscript.id, {
         status: nextStatus,

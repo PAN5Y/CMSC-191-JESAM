@@ -1,9 +1,74 @@
-import { Plus, X, User, Mail, Building2 } from "lucide-react";
+import { Plus, X, User, Mail, Building2, UserCheck } from "lucide-react";
 import type { Author } from "../types";
 import { useSubmissionWizard } from "../context/SubmissionWizardContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function AuthorInformation() {
   const { authors, setAuthors } = useSubmissionWizard();
+  const { user } = useAuth();
+
+  const buildProfileAuthor = (): Author | null => {
+    if (!user) return null;
+
+    const metadata = user.user_metadata ?? {};
+    const name = [
+      metadata.first_name,
+      metadata.middle_name,
+      metadata.last_name,
+      metadata.suffix,
+    ]
+      .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+      .join(" ")
+      .trim();
+
+    return {
+      id: `profile-${user.id}`,
+      name,
+      email: user.email ?? "",
+      orcid: typeof metadata.orcid_id === "string" ? metadata.orcid_id : "",
+      affiliation: typeof metadata.affiliation === "string" ? metadata.affiliation : "",
+      isCorresponding: true,
+    };
+  };
+
+  const useMyProfile = () => {
+    const profileAuthor = buildProfileAuthor();
+    if (!profileAuthor) return;
+
+    setAuthors((prev) => {
+      const existingIndex = prev.findIndex(
+        (author) =>
+          author.email.trim().toLowerCase() === profileAuthor.email.trim().toLowerCase()
+      );
+      const blankIndex = prev.findIndex(
+        (author) =>
+          !author.name.trim() &&
+          !author.email.trim() &&
+          !author.affiliation.trim() &&
+          !(author.orcid ?? "").trim()
+      );
+
+      const next = prev.map((author) => ({ ...author, isCorresponding: false }));
+      const targetIndex = existingIndex >= 0 ? existingIndex : blankIndex >= 0 ? blankIndex : next.length;
+      const existing = next[targetIndex];
+      const mergedAuthor: Author = {
+        ...profileAuthor,
+        id: existing?.id ?? profileAuthor.id,
+        name: profileAuthor.name || existing?.name || "",
+        email: profileAuthor.email || existing?.email || "",
+        orcid: profileAuthor.orcid || existing?.orcid || "",
+        affiliation: profileAuthor.affiliation || existing?.affiliation || "",
+        isCorresponding: true,
+      };
+
+      if (targetIndex < next.length) {
+        next[targetIndex] = mergedAuthor;
+        return next;
+      }
+
+      return [...next, mergedAuthor];
+    });
+  };
 
   const addAuthor = () => {
     const newAuthor: Author = {
@@ -48,8 +113,27 @@ export function AuthorInformation() {
       <div>
         <h2 className="text-2xl font-semibold text-gray-900 mb-2">Author Information</h2>
         <p className="text-gray-600">
-          Provide complete information for all authors. ORCID iDs are required for transparency and proper attribution.
+          Provide complete information for all authors. ORCID iDs are optional but recommended for attribution.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div>
+          <h3 className="font-medium text-blue-950">Use your registered author details</h3>
+          <p className="text-sm text-blue-800 mt-1">
+            Fill your name, email, affiliation, and ORCID when available, then set you as the
+            corresponding author.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={useMyProfile}
+          disabled={!user}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <UserCheck className="h-4 w-4" />
+          Use my profile
+        </button>
       </div>
 
       <div className="space-y-6">
@@ -113,7 +197,7 @@ export function AuthorInformation() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  ORCID iD <span className="text-red-500">*</span>
+                  ORCID iD <span className="text-gray-500">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -179,7 +263,7 @@ export function AuthorInformation() {
       <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
         <h4 className="font-medium text-amber-900 mb-2">Important Notes:</h4>
         <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
-          <li>All authors must have a valid ORCID iD</li>
+          <li>ORCID iDs are optional but recommended for indexing and attribution</li>
           <li>The corresponding author will receive all editorial communications</li>
           <li>Author order reflects contribution level (first author = primary contributor)</li>
           <li>Affiliations should include full institutional details</li>

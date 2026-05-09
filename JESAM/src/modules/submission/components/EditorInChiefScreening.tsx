@@ -32,27 +32,16 @@ export function EditorInChiefScreening({
     }
   };
 
-  const getSimilarityColor = (similarity: number) => {
-    if (similarity <= 15) return "text-green-700";
-    if (similarity <= 30) return "text-yellow-700";
-    return "text-red-700";
-  };
-
-  const similarityOf = (m: Manuscript) =>
-    typeof m.submission_metadata?.similarity_score === "number"
-      ? m.submission_metadata.similarity_score
-      : 0;
-
   return (
     <div className="space-y-6">
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-sm font-semibold text-blue-900 mb-1">Editor screening process</h4>
+            <h4 className="text-sm font-semibold text-blue-900 mb-1">Initial screening process</h4>
             <p className="text-sm text-blue-800">
-              Editor-in-Chief performs initial screening decisions for new submissions: return to
-              author, desk reject, or proceed to peer review.
+              Editor-in-Chief and Managing Editor perform initial screening decisions: return to
+              author, desk reject, or proceed to production checks.
             </p>
           </div>
         </div>
@@ -77,7 +66,7 @@ export function EditorInChiefScreening({
                   Focus
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Similarity
+                  Checks
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Actions
@@ -87,7 +76,6 @@ export function EditorInChiefScreening({
             <tbody className="divide-y divide-gray-200">
               {manuscripts.map((manuscript) => {
                 const ref = manuscript.reference_code ?? manuscript.id.slice(0, 8).toUpperCase();
-                const sim = similarityOf(manuscript);
                 const dateStr = new Date(manuscript.created_at).toLocaleDateString();
                 const authorsDisplay = manuscript.authors.join(", ");
                 const cls = manuscript.classification ?? "—";
@@ -114,7 +102,7 @@ export function EditorInChiefScreening({
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-semibold ${getSimilarityColor(sim)}`}>{sim}%</span>
+                      <span className="text-sm font-medium text-gray-500">Not run yet</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2 flex-wrap">

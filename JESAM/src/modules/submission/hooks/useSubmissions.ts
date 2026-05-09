@@ -14,7 +14,7 @@ import type {
   SubmissionMetadata,
 } from "@/types";
 import type { ScreeningDecision } from "../types";
-import { appendAudit, appendNotification } from "@/lib/workflow";
+import { appendAudit, appendNotification, getCorrespondingAuthorEmail } from "@/lib/workflow";
 
 export interface CreateManuscriptFromWizardInput {
   metadata: {
@@ -49,31 +49,13 @@ export interface CreateManuscriptFromWizardInput {
   manuscriptFile: File | null;
 }
 
-function parseSimilarityFromMessage(message: string): number | undefined {
-  const m = message.match(/(\d+(?:\.\d+)?)%/);
-  if (m) return parseFloat(m[1]);
-  return undefined;
-}
-
 function buildSubmissionMetadata(input: CreateManuscriptFromWizardInput): SubmissionMetadata {
-  const sim =
-    parseSimilarityFromMessage(input.checks.plagiarism.message) ??
-    (input.checks.plagiarism.message.includes("%")
-      ? undefined
-      : undefined);
-
   return {
     funding: input.metadata.funding,
     subjectArea: input.metadata.subjectArea,
     competingInterests: input.metadata.competingInterests,
     ethicalApprovals: input.metadata.ethicalApprovals,
     author_details: input.authors,
-    automated_checks: {
-      formatting: input.checks.formatting,
-      assets: input.checks.assets,
-      plagiarism: input.checks.plagiarism,
-    },
-    similarity_score: sim,
     declarations: input.declarations,
   };
 }
@@ -138,8 +120,6 @@ export function useSubmissions() {
 
         const submission_metadata: SubmissionMetadata = {
           ...buildSubmissionMetadata(input),
-          similarity_score:
-            parseSimilarityFromMessage(input.checks.plagiarism.message),
           notifications: [
             {
               id: `notif-${Date.now()}`,
@@ -147,7 +127,7 @@ export function useSubmissions() {
               recipientRole: "author",
               recipientEmail: user.email,
               message:
-                "Submission received. A handling editor will verify formatting; then the Editor-in-Chief will screen the manuscript.",
+                "Submission received. Your manuscript is awaiting initial editorial screening.",
               createdAt: new Date().toISOString(),
               delivered: true,
             },
@@ -170,7 +150,7 @@ export function useSubmissions() {
           authors: authorStrings,
           keywords,
           classification,
-          status: "Pending Format Verification",
+          status: "Initial Screening",
           submission_metadata,
         });
 
@@ -245,35 +225,48 @@ export function useSubmissions() {
       try {
         const newStatus: ManuscriptStatus =
           decision.decision === "approve"
-            ? "Peer Review"
-            : decision.decision === "reject"
-              ? "Rejected"
-              : "Returned to Author";
+            ? "Production Checks"
+            : "Rejected";
 
+        const comments = decision.comments?.trim();
         const metaPatch: Partial<SubmissionMetadata> = {
-          screening_comments: decision.comments,
+          screening_comments: comments || undefined,
           screening_decided_at: decision.decidedAt,
           screening_decided_by: decision.decidedBy,
         };
         if (decision.decision === "reject") {
           metaPatch.rejection_reason = decision.rejectionReason;
+          metaPatch.rejection_comments = comments || decision.rejectionReason;
         }
 
         const existing = manuscripts.find((m) => m.id === decision.id);
         const prevMeta = existing?.submission_metadata ?? {};
+        const authorMessage =
+          decision.decision === "reject"
+            ? [
+                "Your manuscript was rejected during initial editorial screening.",
+                decision.rejectionReason ? `Reason: ${decision.rejectionReason}` : undefined,
+                comments ? `Editorial comments: ${comments}` : undefined,
+              ]
+                .filter(Boolean)
+                .join("\n\n")
+            : "Your manuscript passed initial editorial screening and was forwarded to production checks.";
         const submission_metadata = {
           ...prevMeta,
           ...metaPatch,
           notifications: appendNotification(existing ?? ({} as Manuscript), {
             type: "screening-decision",
             recipientRole: "author",
-            message: `Screening decision applied: ${decision.decision}.`,
+            recipientEmail: existing ? getCorrespondingAuthorEmail(existing) : undefined,
+            message: authorMessage,
           }),
           audit_logs: appendAudit(
             existing ?? ({} as Manuscript),
             decision.decidedBy,
             "screening-decision",
-            decision.decision
+            decision.decision === "reject"
+              ? [decision.rejectionReason, comments].filter(Boolean).join(" - ")
+              : decision.decision
           ),
         } as SubmissionMetadata;
 

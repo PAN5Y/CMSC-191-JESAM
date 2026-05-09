@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AutomatedCheckSnapshot } from "@/types";
 import { RevisionAutomatedChecks } from "../components/RevisionAutomatedChecks";
@@ -13,11 +14,38 @@ import {
 } from "../hooks/useRevision";
 
 const EDITOR_ROLES = new Set([
-  "associate_editor",
-  "managing_editor",
-  "editor_in_chief",
+  "technical_editor",
   "system_admin",
 ]);
+
+function CheckResultList({ checks }: { checks?: AutomatedCheckSnapshot }) {
+  if (!checks) return null;
+
+  const rows: Array<[keyof AutomatedCheckSnapshot, string]> = [
+    ["formatting", "Formatting"],
+    ["assets", "Assets"],
+    ["plagiarism", "Similarity"],
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      {rows.map(([key, label]) => {
+        const result = checks[key];
+        return (
+          <div key={key} className="rounded border border-amber-200 bg-white/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+              {label}
+            </p>
+            <p className="text-sm font-medium text-amber-950 capitalize mt-1">{result.status}</p>
+            {result.message && (
+              <p className="text-xs text-amber-900 mt-1 whitespace-pre-wrap">{result.message}</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function RevisionDashboard() {
   const { role } = useAuth();
@@ -26,6 +54,7 @@ export default function RevisionDashboard() {
   const [authorNote, setAuthorNote] = useState("");
   const [responseLetter, setResponseLetter] = useState("");
   const [revisionFile, setRevisionFile] = useState<File | null>(null);
+  const [submittingRevision, setSubmittingRevision] = useState(false);
   const [revisionCheckResult, setRevisionCheckResult] = useState<{
     checks: AutomatedCheckSnapshot;
     pass: boolean;
@@ -58,11 +87,21 @@ export default function RevisionDashboard() {
     : false;
   const isEditorialUser = role ? EDITOR_ROLES.has(role) : false;
 
-  const revisionRounds = selected?.submission_metadata?.revision_cycle?.rounds ?? [];
+  const revisionRounds = useMemo(
+    () =>
+      [...(selected?.submission_metadata?.revision_cycle?.rounds ?? [])].sort((a, b) => {
+        const byDate = new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+        return byDate || b.round - a.round;
+      }),
+    [selected?.submission_metadata?.revision_cycle?.rounds]
+  );
   const extensionGrants = selected?.submission_metadata?.revision_extension_grants ?? [];
   const selectedIntakeFormatResubmit = selected
     ? intakeReturnedAuthorResubmitGoesToFormatQueue(selected)
     : false;
+  const selectedProductionFormatRevision = selected?.status === "For Format Revision";
+  const productionComments = selected?.submission_metadata?.production_decision_comments;
+  const productionChecks = selected?.submission_metadata?.automated_checks;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -183,10 +222,126 @@ export default function RevisionDashboard() {
                 )}
               </div>
 
+              {role === "author" && selectedNeedsAction && selectedIntakeFormatResubmit && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+                  <p className="font-medium">Intake resubmission</p>
+                  <p className="mt-1 text-amber-900">
+                    You have not yet entered external peer review for this manuscript. After you submit the revised
+                    file and checks pass, it will return to the <strong>format verification</strong> queue—not directly
+                    to reviewers.
+                  </p>
+                </div>
+              )}
+
+              {role === "author" && selectedNeedsAction && selectedProductionFormatRevision && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 space-y-3">
+                  <div>
+                    <p className="font-medium">Production Editor revision request</p>
+                    <p className="mt-1 text-amber-900">
+                      Review the comments and check results below before uploading your revised
+                      manuscript.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+                      Comments
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap">
+                      {productionComments?.trim() || "No additional comments were provided."}
+                    </p>
+                  </div>
+                  <CheckResultList checks={productionChecks} />
+                </div>
+              )}
+
+              {role === "author" && selectedNeedsAction && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-gray-900">Submit revised manuscript</h3>
+                  <label className="block text-sm text-gray-700">
+                    Revised manuscript file (PDF, DOC, or DOCX)
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="mt-1 block w-full text-sm text-gray-600"
+                      onChange={(e) => {
+                        setRevisionFile(e.target.files?.[0] ?? null);
+                        setRevisionCheckResult(null);
+                      }}
+                    />
+                  </label>
+                  {selectedProductionFormatRevision ? (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950">
+                      <p className="font-medium">Production format revision</p>
+                      <p className="mt-1 text-blue-900">
+                        Upload the corrected file here. The Production Editor will run similarity
+                        and format checks after resubmission.
+                      </p>
+                    </div>
+                  ) : (
+                    <RevisionAutomatedChecks
+                      file={revisionFile}
+                      manuscriptKey={selected.id}
+                      onResult={onRevisionChecksResult}
+                    />
+                  )}
+                  <textarea
+                    value={authorNote}
+                    onChange={(e) => setAuthorNote(e.target.value)}
+                    placeholder="Revision summary"
+                    rows={3}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  />
+                  <textarea
+                    value={responseLetter}
+                    onChange={(e) => setResponseLetter(e.target.value)}
+                    placeholder="Response-to-reviewers letter (optional; can also attach in PDF only)"
+                    rows={4}
+                    className="w-full border border-gray-300 rounded px-3 py-2"
+                  />
+                  <button
+                    type="button"
+                    disabled={
+                      submittingRevision ||
+                      !authorNote.trim() ||
+                      !revisionFile ||
+                      (!selectedProductionFormatRevision && !revisionCheckResult?.pass)
+                    }
+                    onClick={() =>
+                      void (async () => {
+                        if (!revisionFile) return;
+                        if (!selectedProductionFormatRevision && !revisionCheckResult?.pass) return;
+                        setSubmittingRevision(true);
+                        try {
+                          const ok = await submitRevision(selected, {
+                            authorNote,
+                            responseLetter: responseLetter.trim() || undefined,
+                            file: revisionFile,
+                            automatedChecks: revisionCheckResult?.checks,
+                            similarityScore: revisionCheckResult?.similarityScore,
+                          });
+                          if (ok) {
+                            setAuthorNote("");
+                            setResponseLetter("");
+                            setRevisionFile(null);
+                            setRevisionCheckResult(null);
+                          }
+                        } finally {
+                          setSubmittingRevision(false);
+                        }
+                      })()
+                    }
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50"
+                  >
+                    {submittingRevision && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {submittingRevision ? "Submitting..." : "Submit revision"}
+                  </button>
+                </div>
+              )}
+
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Revision uploads (one row per file)</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">Previous revision versions</h3>
                 <p className="text-xs text-gray-500 mb-2">
-                  Each version is stored when you upload a revised manuscript; extensions are listed separately.
+                  Most recent revision first. Each version is stored when you upload a revised manuscript.
                 </p>
                 <div className="space-y-2">
                   {revisionRounds.map((round) => (
@@ -236,84 +391,7 @@ export default function RevisionDashboard() {
                 </div>
               )}
 
-              {role === "author" && selectedNeedsAction && selectedIntakeFormatResubmit && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                  <p className="font-medium">Intake resubmission</p>
-                  <p className="mt-1 text-amber-900">
-                    You have not yet entered external peer review for this manuscript. After you submit the revised
-                    file and checks pass, it will return to the <strong>format verification</strong> queue—not directly
-                    to reviewers.
-                  </p>
-                </div>
-              )}
-
-              {role === "author" && selectedNeedsAction && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-gray-900">Submit revised manuscript</h3>
-                  <label className="block text-sm text-gray-700">
-                    Revised manuscript file (PDF)
-                    <input
-                      type="file"
-                      accept=".pdf,application/pdf"
-                      className="mt-1 block w-full text-sm text-gray-600"
-                      onChange={(e) => {
-                        setRevisionFile(e.target.files?.[0] ?? null);
-                        setRevisionCheckResult(null);
-                      }}
-                    />
-                  </label>
-                  <RevisionAutomatedChecks
-                    file={revisionFile}
-                    manuscriptKey={selected.id}
-                    onResult={onRevisionChecksResult}
-                  />
-                  <textarea
-                    value={authorNote}
-                    onChange={(e) => setAuthorNote(e.target.value)}
-                    placeholder="Revision summary"
-                    rows={3}
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                  />
-                  <textarea
-                    value={responseLetter}
-                    onChange={(e) => setResponseLetter(e.target.value)}
-                    placeholder="Response-to-reviewers letter (optional; can also attach in PDF only)"
-                    rows={4}
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                  />
-                  <button
-                    type="button"
-                    disabled={
-                      !authorNote.trim() ||
-                      !revisionFile ||
-                      !revisionCheckResult?.pass
-                    }
-                    onClick={() =>
-                      void (async () => {
-                        if (!revisionFile || !revisionCheckResult?.pass) return;
-                        const ok = await submitRevision(selected, {
-                          authorNote,
-                          responseLetter: responseLetter.trim() || undefined,
-                          file: revisionFile,
-                          automatedChecks: revisionCheckResult.checks,
-                          similarityScore: revisionCheckResult.similarityScore,
-                        });
-                        if (ok) {
-                          setAuthorNote("");
-                          setResponseLetter("");
-                          setRevisionFile(null);
-                          setRevisionCheckResult(null);
-                        }
-                      })()
-                    }
-                    className="px-4 py-2 bg-gray-900 text-white rounded disabled:opacity-50"
-                  >
-                    Submit revision
-                  </button>
-                </div>
-              )}
-
-              {(role === "associate_editor" || role === "managing_editor" || role === "editor_in_chief" || role === "system_admin") &&
+              {(role === "technical_editor" || role === "system_admin") &&
                 selectedNeedsAction && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-gray-900">Grant extension</h3>
