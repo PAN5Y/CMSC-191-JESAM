@@ -30,6 +30,8 @@ function getStatusColor(status: ManuscriptStatus) {
       return 'bg-pink-100 text-pink-800';
     case 'Peer Review':
       return 'bg-indigo-100 text-indigo-800';
+    case 'Editorial Review':
+      return 'bg-purple-100 text-purple-800';
     case 'Revision Requested':
       return 'bg-orange-100 text-orange-900';
     case 'Returned to Author':

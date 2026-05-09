@@ -17,6 +17,11 @@ function metadataPatch(manuscript: Manuscript, patch: Record<string, unknown>) {
   return { ...prev, ...patch };
 }
 
+/** Editor must complete internal review before notifying the author (1-week editorial review stage). */
+export function manuscriptNeedsEditorialReview(m: Manuscript): boolean {
+  return m.status === "Editorial Review";
+}
+
 /** Manuscript is waiting on an author upload (revision queue). */
 export function manuscriptNeedsRevisionAction(m: Manuscript): boolean {
   return (
@@ -83,16 +88,23 @@ export function useRevision() {
     void fetchManuscripts();
   }, [fetchManuscripts]);
 
-  /** Active revision queue plus any item with version history (e.g. back in Peer Review after submit). */
+  /** Active revision queue plus editorial review stage and any item with version history. */
   const revisionManuscripts = useMemo(() => {
     const byId = new Map<string, Manuscript>();
     for (const m of manuscripts) {
-      if (manuscriptNeedsRevisionAction(m) || manuscriptHasRevisionUploads(m)) {
+      if (
+        manuscriptNeedsEditorialReview(m) ||
+        manuscriptNeedsRevisionAction(m) ||
+        manuscriptHasRevisionUploads(m)
+      ) {
         byId.set(m.id, m);
       }
     }
     const merged = Array.from(byId.values());
     merged.sort((a, b) => {
+      const aEditorial = manuscriptNeedsEditorialReview(a);
+      const bEditorial = manuscriptNeedsEditorialReview(b);
+      if (aEditorial !== bEditorial) return aEditorial ? -1 : 1;
       const aActive = manuscriptNeedsRevisionAction(a);
       const bActive = manuscriptNeedsRevisionAction(b);
       if (aActive !== bActive) return aActive ? -1 : 1;
@@ -213,6 +225,39 @@ export function useRevision() {
     [save, user?.id]
   );
 
+  const sendToAuthor = useCallback(
+    async (manuscript: Manuscript) => {
+      if (manuscript.status !== "Editorial Review") {
+        toast.error("Manuscript is not in Editorial Review.");
+        return false;
+      }
+      const ref = manuscript.reference_code ?? manuscript.id;
+      const prev = manuscript.submission_metadata ?? {};
+      const nextMeta = metadataPatch(manuscript, {
+        revision_cycle: {
+          rounds: prev.revision_cycle?.rounds ?? [],
+          extensionPolicyDays: 14,
+        },
+        notifications: appendNotification(manuscript, {
+          type: "revision-requested",
+          recipientRole: "author",
+          message: `Your manuscript ${ref} has been reviewed editorially and requires revision. You have 2 weeks to submit.`,
+        }),
+        audit_logs: appendAudit(
+          manuscript,
+          "editor",
+          "revision-sent-to-author",
+          "Editorial review complete; author notified for revision."
+        ),
+      });
+      return save(manuscript.id, {
+        status: "Revision Requested" as ManuscriptStatus,
+        submission_metadata: nextMeta,
+      });
+    },
+    [save]
+  );
+
   const grantExtension = useCallback(
     async (manuscript: Manuscript, reason: string) => {
       const { error: insertError } = await insertRevisionExtensionGrant(manuscript.id, reason);
@@ -232,6 +277,7 @@ export function useRevision() {
     manuscripts: revisionManuscripts,
     fetchManuscripts,
     submitRevision,
+    sendToAuthor,
     grantExtension,
   };
 }

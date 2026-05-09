@@ -7,6 +7,7 @@ import {
   intakeReturnedAuthorResubmitGoesToFormatQueue,
   manuscriptAwaitingEditorialReReviewAfterRevision,
   manuscriptHasRevisionUploads,
+  manuscriptNeedsEditorialReview,
   manuscriptNeedsEditorToStartPostRevisionRound,
   manuscriptNeedsRevisionAction,
   useRevision,
@@ -21,7 +22,7 @@ const EDITOR_ROLES = new Set([
 
 export default function RevisionDashboard() {
   const { role } = useAuth();
-  const { manuscripts, submitRevision, grantExtension } = useRevision();
+  const { manuscripts, submitRevision, sendToAuthor, grantExtension } = useRevision();
   const [selectedId, setSelectedId] = useState("");
   const [authorNote, setAuthorNote] = useState("");
   const [responseLetter, setResponseLetter] = useState("");
@@ -51,6 +52,7 @@ export default function RevisionDashboard() {
     [manuscripts, selectedId]
   );
 
+  const selectedNeedsEditorialReview = selected ? manuscriptNeedsEditorialReview(selected) : false;
   const selectedNeedsAction = selected ? manuscriptNeedsRevisionAction(selected) : false;
   const selectedHasUploads = selected ? manuscriptHasRevisionUploads(selected) : false;
   const selectedPostRevisionPeerReview = selected
@@ -313,8 +315,26 @@ export default function RevisionDashboard() {
                 </div>
               )}
 
-              {(role === "associate_editor" || role === "managing_editor" || role === "editor_in_chief" || role === "system_admin") &&
-                selectedNeedsAction && (
+              {isEditorialUser && selectedNeedsEditorialReview && (
+                <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-4 space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-purple-900">Editorial Review</h3>
+                    <p className="text-sm text-purple-800 mt-1">
+                      Complete your internal editorial review of this manuscript. When ready, click
+                      <strong> Send to Author</strong> to notify the author and open a 2-week revision window.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void sendToAuthor(selected)}
+                    className="px-4 py-2 bg-purple-700 text-white rounded hover:bg-purple-800"
+                  >
+                    Send to Author
+                  </button>
+                </div>
+              )}
+
+              {isEditorialUser && selectedNeedsAction && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-gray-900">Grant extension</h3>
                   <textarea
@@ -333,7 +353,7 @@ export default function RevisionDashboard() {
                     Grant extension
                   </button>
                 </div>
-                )}
+              )}
             </>
           )}
         </div>

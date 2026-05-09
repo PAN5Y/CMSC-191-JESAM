@@ -61,7 +61,10 @@ export function usePeerReview() {
   }, [fetchManuscripts]);
 
   const peerReviewManuscripts = manuscripts.filter(
-    (m) => m.status === 'Peer Review' || m.status === 'Revision Requested'
+    (m) =>
+      m.status === 'Peer Review' ||
+      m.status === 'Editorial Review' ||
+      m.status === 'Revision Requested'
   );
 
   const save = useCallback(
@@ -293,7 +296,7 @@ export function usePeerReview() {
           : decision === 'reject'
             ? 'Rejected'
             : decision === 'revise'
-              ? 'Revision Requested'
+              ? 'Editorial Review'
               : 'Peer Review';
 
       if (relational) {

@@ -7,6 +7,7 @@ export type ManuscriptStatus =
   | "Pending Format Verification"
   | "Editor In Chief Screening"
   | "Peer Review"
+  | "Editorial Review"
   | "Revision Requested"
   | "Returned to Author"
   | "Rejected"

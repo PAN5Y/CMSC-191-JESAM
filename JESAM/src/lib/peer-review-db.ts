@@ -572,7 +572,7 @@ export async function fetchReviewerAssignmentsFromDb(
 
   if (error) return { data: [], error: new Error(error.message) };
 
-  const statuses = new Set(["Peer Review", "Revision Requested"]);
+  const statuses = new Set(["Peer Review", "Editorial Review", "Revision Requested"]);
   const rows: ReviewerAssignmentRow[] = [];
 
   for (const raw of data ?? []) {
