@@ -13,6 +13,7 @@ export type ManuscriptStatus =
   | "Revision Requested"
   | "Returned to Author"
   | "Rejected"
+  | "Editorial Review"
   | "Accepted"
   | "In Production"
   | "In Layout"
