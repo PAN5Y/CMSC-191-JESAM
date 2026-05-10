@@ -1,90 +1,158 @@
-import { useMemo, useState } from "react";
-import { CHATBOT_FAQ, answerWorkflowQuestion } from "@/lib/workflow-assistant";
+// AIChatbotPage.tsx  (src/modules/ai-chatbot/pages/AIChatbotPage.tsx)
 
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
+import { RotateCcw } from "lucide-react";
+import { useEffect, useRef } from "react";
+
+import { ChatInput } from "../components/ChatInput";
+import { FaqShortcuts } from "../components/FaqShortcuts";
+import { MessageBubble } from "../components/MessageBubble";
+import { useChat } from "../hooks/useChat";
+import { FAQ_SHORTCUTS } from "../lib/chatbot-config";
+
+// ---------------------------------------------------------------------------
+// Helper: format today's date in the header style "April 10, 2026"
+// ---------------------------------------------------------------------------
+function formatHeaderDate(): string {
+  return new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
 export default function AIChatbotPage() {
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "m1",
-      role: "assistant",
-      text: "Hello. I am the JESAM assistive chatbot for workflow and formatting FAQs.",
-    },
-  ]);
+  const { messages, isLoading, sendMessage, clearChat } = useChat();
 
-  const faqButtons = useMemo(() => CHATBOT_FAQ.slice(0, 3), []);
+  // Scroll-to-bottom anchor
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
-  const send = (text: string) => {
-    if (!text.trim()) return;
-    const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", text };
-    const botMsg: ChatMessage = {
-      id: `a-${Date.now()}`,
-      role: "assistant",
-      text: answerWorkflowQuestion(text),
-    };
-    setMessages((prev) => [...prev, userMsg, botMsg]);
-    setInput("");
-  };
+  // Scroll down whenever the message count changes (new message added).
+  // We intentionally do NOT depend on messages directly to avoid
+  // scrolling on every streaming token.
+  useEffect(() => {
+    scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900">AI Chatbot (Assistive)</h1>
-          <p className="text-gray-600 mt-1">
-            FAQ and workflow guidance only. Final editorial decisions remain human-controlled.
-          </p>
-        </div>
-      </div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-5">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
-          This assistant is intentionally non-authoritative: it provides guidance, not final decisions.
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-sm font-medium text-gray-900 mb-3">Quick questions</p>
-          <div className="flex flex-wrap gap-2">
-            {faqButtons.map((f) => (
-              <button
-                key={f.q}
-                type="button"
-                onClick={() => send(f.q)}
-                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-sm"
-              >
-                {f.q}
-              </button>
-            ))}
-          </div>
+    /*
+     * The page fills the area to the right of the 256px sidebar.
+     * It uses flex-col so the message list can flex-grow and the input
+     * stays pinned at the bottom.
+     */
+    <div
+      className="flex flex-col h-screen bg-gray-50"
+      style={{ fontFamily: "'Public Sans', sans-serif" }}
+    >
+      {/* ------------------------------------------------------------------ */}
+      {/* Header                                                              */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="flex items-start justify-between px-8 py-6 bg-white border-b border-gray-200 flex-shrink-0">
+        <div>
+          <h1
+            className="text-2xl font-bold text-gray-900"
+            style={{ fontFamily: "'Newsreader', serif" }}
+          >
+            AI Chatbot
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">For inquiries and assistance</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4 h-[420px] overflow-y-auto space-y-3">
-          {messages.map((m) => (
-            <div key={m.id} className={`p-3 rounded ${m.role === "assistant" ? "bg-blue-50" : "bg-gray-100"}`}>
-              <p className="text-xs uppercase text-gray-500">{m.role}</p>
-              <p className="text-sm text-gray-900 mt-1">{m.text}</p>
-            </div>
-          ))}
-        </div>
+        <div className="flex items-center gap-4">
+          {/* Last updated timestamp */}
+          <span className="text-xs text-gray-400">
+            Last updated: {formatHeaderDate()}
+          </span>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-3 flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") send(input);
-            }}
-            placeholder="Ask about submission, peer review, revision, DOI, or publication workflow"
-            className="flex-1 border border-gray-300 rounded px-3 py-2"
-          />
-          <button type="button" onClick={() => send(input)} className="px-4 py-2 bg-gray-900 text-white rounded">
-            Send
+          {/* Clear / reset conversation */}
+          <button
+            type="button"
+            onClick={clearChat}
+            title="Start a new conversation"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 border border-gray-200 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            New chat
           </button>
         </div>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Non-authoritative disclaimer banner                                */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="mx-8 mt-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex-shrink-0">
+        <span className="font-semibold">Note:</span> This assistant is intentionally
+        non-authoritative. It provides guidance and information — final editorial
+        decisions remain with human editors.
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Message list (scrollable)                                           */}
+      {/* ------------------------------------------------------------------ */}
+      <div
+        className="flex-1 overflow-y-auto px-8 py-6 space-y-5"
+        role="log"
+        aria-live="polite"
+        aria-label="Chat messages"
+      >
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+
+        {/*
+         * Typing indicator — shown while we wait for the first streaming
+         * token to arrive (before the placeholder gets any text).
+         */}
+        {isLoading &&
+          messages[messages.length - 1]?.isStreaming &&
+          messages[messages.length - 1]?.text === "" && (
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+                style={{ background: "#3f4b7e", fontFamily: "'Newsreader', serif" }}
+              >
+                J
+              </div>
+              <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+        {/* Bottom anchor for auto-scroll */}
+        <div ref={scrollAnchorRef} aria-hidden="true" />
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* FAQ shortcuts                                                       */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="px-8 py-3 bg-white border-t border-gray-100 flex-shrink-0">
+        <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">
+          Quick questions
+        </p>
+        <FaqShortcuts
+          shortcuts={FAQ_SHORTCUTS}
+          onSelect={sendMessage}
+          disabled={isLoading}
+        />
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Chat input                                                          */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="flex-shrink-0">
+        <ChatInput onSend={sendMessage} isLoading={isLoading} />
       </div>
     </div>
   );
