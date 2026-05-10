@@ -20,20 +20,20 @@ export default function AssignDOIModal({
   const [method, setMethod] = useState<"auto" | "manual">("auto");
   const [manualDOI, setManualDOI] = useState(currentDOI || "");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [crossrefError, setCrossrefError] = useState<string | null>(null);
+  const [zenodoError, setZenodoError] = useState<string | null>(null);
 
   const handleAssign = async () => {
     if (method === "auto") {
       setIsGenerating(true);
-      setCrossrefError(null);
+      setZenodoError(null);
       const result = await onAutoGenerate();
       setIsGenerating(false);
 
       if (result.success) {
         onClose();
       } else {
-        // Crossref failed — show error and switch to manual with pre-filled DOI
-        setCrossrefError(result.error || "Crossref registration failed");
+        // Zenodo failed — show error and switch to manual with pre-filled DOI
+        setZenodoError(result.error || "Zenodo registration failed");
         setManualDOI(result.doi);
         setMethod("manual");
       }
@@ -46,21 +46,21 @@ export default function AssignDOIModal({
 
   return (
     <Modal open={open} onClose={onClose} title="Assign DOI" maxWidth="max-w-lg">
-      {/* Crossref Error Banner */}
-      {crossrefError && (
+      {/* Zenodo Error Banner */}
+      {zenodoError && (
         <div className="mb-4 p-3 bg-[#fff8e1] border border-[#F5C344] rounded-lg">
           <p className="text-sm text-[#f57c00] font-['Public_Sans',sans-serif] mb-2">
-            ⚠️ {crossrefError}
+            ⚠️ {zenodoError}
           </p>
           <p className="text-xs text-[#6b7280] font-['Public_Sans',sans-serif]">
             Please register the DOI manually below, or use the{" "}
             <a
-              href="https://apps.crossref.org/webDeposit/"
+              href="https://sandbox.zenodo.org/deposit/new"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[#3f4b7e] underline inline-flex items-center gap-1"
             >
-              Crossref Web Deposit Form <ExternalLink className="size-3" />
+              Zenodo Web Deposit Form <ExternalLink className="size-3" />
             </a>
           </p>
         </div>
@@ -73,7 +73,7 @@ export default function AssignDOIModal({
         </label>
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => { setMethod("auto"); setCrossrefError(null); }}
+            onClick={() => { setMethod("auto"); setZenodoError(null); }}
             className={`p-4 border-2 rounded-lg text-left transition-all ${
               method === "auto"
                 ? "border-[#3f4b7e] bg-[#e8eaf6]"
@@ -87,7 +87,7 @@ export default function AssignDOIModal({
               </span>
             </div>
             <p className="text-xs text-[#6b7280] font-['Public_Sans',sans-serif]">
-              Register via Crossref API
+              Register via Zenodo API
             </p>
           </button>
 
@@ -141,18 +141,19 @@ export default function AssignDOIModal({
       )}
 
       {/* Auto DOI Preview */}
-      {method === "auto" && !crossrefError && (
+      {method === "auto" && !zenodoError && (
         <div className="mb-6 p-4 bg-[#e8eaf6] rounded-lg border border-[#3f4b7e]/20">
           <div className="flex items-start gap-3">
             <Database className="size-5 text-[#3f4b7e] mt-0.5" />
             <div className="flex-1">
               <div className="text-sm font-['Public_Sans',sans-serif] text-[#1a1c1c] mb-1">
-                Crossref Integration
+                Zenodo Integration
               </div>
               <p className="text-xs text-[#6b7280] font-['Public_Sans',sans-serif] mb-2">
-                DOI will be automatically generated and registered with Crossref
+                DOI will be automatically generated and registered with Zenodo
                 based on manuscript metadata.
               </p>
+
               {currentDOI && (
                 <div className="text-xs font-['Public_Sans',sans-serif] text-[#3f4b7e] mt-2">
                   Current DOI: {currentDOI}
@@ -178,10 +179,10 @@ export default function AssignDOIModal({
           {isGenerating ? (
             <>
               <RefreshCw className="size-4 animate-spin" />
-              Registering with Crossref...
+              Registering with Zenodo...
             </>
           ) : method === "auto" ? (
-            "Generate & Register DOI"
+            "Generate & Register (Zenodo)"
           ) : (
             "Assign DOI"
           )}

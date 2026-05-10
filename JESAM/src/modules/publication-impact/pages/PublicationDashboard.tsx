@@ -1,41 +1,89 @@
 import { useMemo, useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
 import { useManuscripts } from "../hooks/useManuscripts";
-import ManuscriptTable from "../components/ManuscriptTable";
 import ManuscriptCard from "../components/ManuscriptCard";
 import type { ManuscriptStatus } from "../types";
 
-const statusTabs: { label: string; value: ManuscriptStatus | "all" }[] = [
+const statusTabs: {
+  label: string;
+  value: ManuscriptStatus | "all" | "terminal";
+}[] = [
   { label: "All", value: "all" },
-  { label: "Accepted", value: "Accepted" },
-  { label: "In Production", value: "In Production" },
+  { label: "In Layout", value: "In Layout" },
+  { label: "Proofreading", value: "Proofreading" },
+  { label: "Author Review", value: "Author Galley Review" },
+  { label: "Scheduled", value: "Scheduled for Publication" },
+  { label: "Issue Mgmt", value: "In Issue Management" },
   { label: "Published", value: "Published" },
+  { label: "Archived / Declined", value: "terminal" },
 ];
 
 export default function PublicationDashboard() {
-  const { role } = useAuth();
-  const { manuscripts, loading, error, fetchManuscripts } = useManuscripts({
-    publicationOnly: true,
-  });
-  const [activeTab, setActiveTab] = useState<ManuscriptStatus | "all">("all");
-
-  const isAuthor = role === "author";
+  const {
+    manuscripts,
+    loading,
+    error,
+    fetchManuscripts,
+    transitionStatus,
+    completeLayout,
+    proofreadingDecision,
+    latestGalleys,
+    fetchGalleyVersionsForManuscript,
+  } = useManuscripts({ publicationOnly: true });
+  const [activeTab, setActiveTab] = useState<
+    ManuscriptStatus | "all" | "terminal"
+  >("all");
 
   const filteredManuscripts =
     activeTab === "all"
       ? manuscripts
-      : manuscripts.filter((m) => m.status === activeTab);
+      : activeTab === "terminal"
+        ? manuscripts.filter(
+            (m) => m.status === "Archived" || m.status === "Declined",
+          )
+        : manuscripts.filter((m) => m.status === activeTab);
+
+  /* ── Stage counts for the summary bar ── */
+  const counts: Record<string, number> = {};
+  for (const tab of statusTabs) {
+    if (tab.value === "all") {
+      counts["all"] = manuscripts.length;
+    } else if (tab.value === "terminal") {
+      counts["terminal"] = manuscripts.filter(
+        (m) => m.status === "Archived" || m.status === "Declined",
+      ).length;
+    } else {
+      counts[tab.value] = manuscripts.filter(
+        (m) => m.status === tab.value,
+      ).length;
+    }
+  }
 
   const dashboard = useMemo(() => {
     const accepted = manuscripts.filter((m) => m.status === "Accepted");
-    const inProduction = manuscripts.filter((m) => m.status === "In Production");
+    const inProduction = manuscripts.filter(
+      (m) => m.status === "In Production",
+    );
     const published = manuscripts.filter((m) => m.status === "Published");
-    const needsDoi = manuscripts.filter((m) => !m.doi && m.status !== "Published");
+    const needsDoi = manuscripts.filter(
+      (m) => !m.doi && m.status !== "Published",
+    );
     const needsFile = manuscripts.filter((m) => !m.file_url);
     const readyToPublish = manuscripts.filter(
-      (m) => m.title && m.authors.length > 0 && m.keywords.length > 0 && m.file_url && m.doi
+      (m) =>
+        m.title &&
+        m.authors.length > 0 &&
+        m.keywords.length > 0 &&
+        m.file_url &&
+        m.doi,
     );
-    return { accepted, inProduction, published, needsDoi, needsFile, readyToPublish };
+    return {
+      accepted,
+      inProduction,
+      published,
+      needsDoi,
+      needsFile,
+      readyToPublish,
+    };
   }, [manuscripts]);
 
   return (
@@ -46,21 +94,26 @@ export default function PublicationDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-['Newsreader',serif] text-[24px] text-[#3f4b7e] mb-1">
-                Publication & Impact Module
+                Publication &amp; Impact Module
               </h2>
               <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
-                {!isAuthor
-                  ? "Editor Dashboard - Manage accepted manuscripts"
-                  : "Author Portal - Track your manuscript progress"}
+                Manage the post-editing workflow — Layout, Proofreading, Galley
+                Review, Issue Management &amp; Publication
               </p>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-right">
                 <div className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
-                  {manuscripts.length} manuscripts
+                  {manuscripts.length} manuscript
+                  {manuscripts.length !== 1 && "s"}
                 </div>
                 <div className="text-xs text-[#9e9e9e] font-['Public_Sans',sans-serif]">
-                  Last updated: {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                  Last updated:{" "}
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </div>
               </div>
             </div>
@@ -69,73 +122,44 @@ export default function PublicationDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="px-8 py-8">
-        {!isAuthor && (
-          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4 mb-8">
-            {[
-              ["Accepted", dashboard.accepted.length, "Awaiting production"],
-              ["In production", dashboard.inProduction.length, "Being prepared"],
-              ["Ready to publish", dashboard.readyToPublish.length, "Metadata, file, DOI ready"],
-              ["Needs DOI", dashboard.needsDoi.length, "DOI not assigned"],
-              ["Needs file", dashboard.needsFile.length, "Missing manuscript file"],
-              ["Published", dashboard.published.length, "Live articles"],
-            ].map(([label, value, detail]) => (
-              <div key={label} className="bg-white rounded-lg border border-[#e0e0e0] p-4">
-                <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">{label}</p>
-                <p className="text-3xl font-bold text-[#1a1c1c] mt-1">{value}</p>
-                <p className="text-xs text-[#9e9e9e] mt-1">{detail}</p>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {!isAuthor && (dashboard.needsDoi.length > 0 || dashboard.needsFile.length > 0) && (
-          <section className="bg-amber-50 border border-amber-200 rounded-lg p-5 mb-8">
-            <h3 className="font-semibold text-amber-950">Production attention needed</h3>
-            <p className="text-sm text-amber-900 mt-1">
-              Prioritize manuscripts with missing DOI or file readiness before publication.
-            </p>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[...dashboard.needsDoi, ...dashboard.needsFile]
-                .filter((m, index, arr) => arr.findIndex((x) => x.id === m.id) === index)
-                .slice(0, 4)
-                .map((m) => (
-                  <div key={m.id} className="bg-white/80 rounded-lg border border-amber-200 p-3">
-                    <p className="text-sm font-medium text-amber-950 line-clamp-1">{m.title}</p>
-                    <p className="text-xs text-amber-800 mt-1">
-                      {m.reference_code ?? m.id.slice(0, 8)} - {!m.doi ? "Needs DOI" : "Needs file"}
-                    </p>
-                  </div>
-                ))}
-            </div>
-          </section>
-        )}
-
-        {/* Status filter tabs */}
-        <div className="flex items-center gap-2 mb-6">
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-['Public_Sans',sans-serif] transition-all ${
-                activeTab === tab.value
-                  ? "bg-[#3f4b7e] text-white"
-                  : "bg-white border border-[#e0e0e0] text-[#6b7280] hover:border-[#3f4b7e]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      <main className="px-8 py-8 pb-32">
+        {/* Stage summary counters */}
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 mb-6">
+          {statusTabs.map((tab) => {
+            const count = counts[tab.value] ?? 0;
+            const isActive = activeTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`flex flex-col items-center p-3 rounded-lg border transition-all text-center ${
+                  isActive
+                    ? "bg-[#3f4b7e] text-white border-[#3f4b7e]"
+                    : "bg-white text-[#6b7280] border-[#e0e0e0] hover:border-[#3f4b7e]"
+                }`}
+              >
+                <span className="text-xl font-semibold font-['Public_Sans',sans-serif]">
+                  {count}
+                </span>
+                <span className="text-[10px] font-['Public_Sans',sans-serif] leading-tight mt-1">
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
+        {/* Section title */}
         <div className="mb-6">
           <h2 className="font-['Newsreader',serif] text-[24px] text-[#1a1c1c] mb-2">
-            {!isAuthor ? "Accepted Manuscripts" : "Your Manuscripts"}
+            {activeTab === "all"
+              ? "All Manuscripts"
+              : activeTab === "terminal"
+                ? "Archived / Declined"
+                : activeTab}
           </h2>
           <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
-            {!isAuthor
-              ? "Select a manuscript to proceed with the publication workflow"
-              : "Track the publication status of your submitted manuscripts"}
+            Select a manuscript to manage its publication workflow
           </p>
         </div>
 
@@ -166,22 +190,22 @@ export default function PublicationDashboard() {
           </div>
         )}
 
-        {/* Content */}
+        {/* Manuscript Cards */}
         {!loading && !error && (
           <>
-            {/* Editor View - Table */}
-            {!isAuthor && (
-              <ManuscriptTable manuscripts={filteredManuscripts} />
-            )}
-
-            {/* Author View - Cards */}
-            {isAuthor && (
-              <div className="grid gap-6">
-                {filteredManuscripts.map((manuscript) => (
-                  <ManuscriptCard key={manuscript.id} manuscript={manuscript} />
-                ))}
-              </div>
-            )}
+            <div className="grid gap-6">
+              {filteredManuscripts.map((manuscript) => (
+                <ManuscriptCard
+                  key={manuscript.id}
+                  manuscript={manuscript}
+                  latestGalley={latestGalleys.get(manuscript.id) ?? null}
+                  onTransition={transitionStatus}
+                  onCompleteLayout={completeLayout}
+                  onProofreadingDecision={proofreadingDecision}
+                  onLoadVersionHistory={fetchGalleyVersionsForManuscript}
+                />
+              ))}
+            </div>
 
             {/* Empty state */}
             {filteredManuscripts.length === 0 && (

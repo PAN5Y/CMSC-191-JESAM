@@ -8,8 +8,21 @@ export function generateDOIString(manuscript: Manuscript): string {
   const year = new Date().getFullYear();
   // Extract a short hash from the UUID for uniqueness
   const seq = manuscript.id.split("-")[0].slice(0, 4);
-  return `10.47125/jesam.${year}.27.1.${seq}`;
+
+  // Try to extract volume/issue from issue_assignment string (e.g. "Vol 27, Issue 1")
+  let volume = "27";
+  let issue = "1";
+
+  if (manuscript.issue_assignment) {
+    const volMatch = manuscript.issue_assignment.match(/Vol\s+(\d+)/i);
+    const issMatch = manuscript.issue_assignment.match(/Issue\s+(\d+)/i);
+    if (volMatch) volume = volMatch[1];
+    if (issMatch) issue = issMatch[1];
+  }
+
+  return `10.47125/jesam.${year}.${volume}.${issue}.${seq}`;
 }
+
 
 /**
  * Build Crossref-compliant deposit XML for a journal article.

@@ -15,23 +15,37 @@ export type ManuscriptStatus =
   | "Rejected"
   | "Accepted"
   | "In Production"
+  | "In Layout"
+  | "Proofreading"
+  | "Author Galley Review"
+  | "Scheduled for Publication"
+  | "In Issue Management"
   | "Published"
+  | "Archived"
   | "Return to Revision"
-  | "Retracted";
+  | "Retracted"
+  | "Declined";
 
 /** Statuses shown on Publication & Impact dashboard (post-acceptance pipeline). */
 export const PUBLICATION_PIPELINE_STATUSES: ManuscriptStatus[] = [
   "Accepted",
   "In Production",
+  "In Layout",
+  "Proofreading",
+  "Author Galley Review",
+  "Scheduled for Publication",
+  "In Issue Management",
   "Published",
   "Return to Revision",
   "Retracted",
+  "Declined"
 ];
 
 export type AppRole =
   | "author"
   | "reviewer"
   | "associate_editor"
+  | "technical_editor"
   | "managing_editor"
   | "technical_editor"
   | "production_editor"
@@ -62,6 +76,17 @@ export interface ManuscriptMetrics {
   downloads: number;
   citations: number;
   last_updated?: string;
+}
+
+/** A galley version row from manuscript_revision_versions (publication pipeline). */
+export interface GalleyVersion {
+  id: string;
+  manuscript_id: string;
+  revision_number: number;
+  file_url: string;
+  author_note: string;
+  submitter_id: string | null;
+  submitted_at: string;
 }
 
 /** Rich author line items stored inside submission_metadata (not duplicated on authors array). */
@@ -166,14 +191,14 @@ export interface RevisionVersion {
 export interface NotificationEvent {
   id: string;
   type:
-    | "submission-received"
-    | "screening-decision"
-    | "review-invitation"
-    | "review-submitted"
-    | "revision-requested"
-    | "revision-submitted"
-    | "accepted"
-    | "published";
+  | "submission-received"
+  | "screening-decision"
+  | "review-invitation"
+  | "review-submitted"
+  | "revision-requested"
+  | "revision-submitted"
+  | "accepted"
+  | "published";
   recipientRole: AppRole | "public";
   recipientEmail?: string;
   message: string;
@@ -233,7 +258,18 @@ export interface SubmissionMetadata {
     keywords?: string[];
     generatedAt?: string;
   };
+  /** Editor feedback submitted during In Layout / Proofreading stages. */
+  galley_feedback?: {
+    remarks: string;
+    fileUrl?: string;
+    feedbackType: "minor" | "major";
+    submittedBy: string;
+    submittedAt: string;
+  };
+  /** Timestamp of successful DOI deposit with Crossref. */
+  doi_deposited_at?: string;
 }
+
 
 export interface Manuscript {
   id: string;
@@ -252,6 +288,10 @@ export interface Manuscript {
   reference_code?: string | null;
   /** Active peer-review round; relational store mirrors former submission_metadata.peer_review.activeRound */
   peer_review_active_round?: number | null;
+  /** Editor proofreading remarks (DB column on manuscripts table). */
+  editor_remarks?: string | null;
+  /** Author sign-off gate — only flipped true by the author (DB column). */
+  author_approved?: boolean;
   submission_metadata?: SubmissionMetadata | null;
   metrics?: ManuscriptMetrics | null;
 }
@@ -362,6 +402,8 @@ export function normalizeManuscriptRow(row: Record<string, unknown>): Manuscript
         ? null
         : Number(row.peer_review_active_round),
     submission_metadata: parseSubmissionMetadata(row.submission_metadata),
+    editor_remarks: (row.editor_remarks as string) ?? null,
+    author_approved: row.author_approved === true,
     metrics,
   };
 }

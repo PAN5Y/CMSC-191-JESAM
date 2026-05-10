@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -10,6 +10,10 @@ import {
   FileWarning,
   CheckCircle2,
   AlertCircle,
+  Eye,
+  RotateCcw,
+  X,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +33,7 @@ import ArticlePreviewModal from "../components/ArticlePreviewModal";
 import MetadataExportModal from "../components/MetadataExportModal";
 import ManuscriptPdfViewer from "@/components/common/ManuscriptPdfViewer";
 import type { Manuscript } from "../types";
+import type { GalleyVersion } from "@/types";
 import { getAuthorDecisionFeedback } from "@/lib/manuscript-feedback";
 
 export default function ArticleDetail() {
@@ -49,10 +54,23 @@ export default function ArticleDetail() {
     retractManuscript,
     assignIssue,
     refreshMetrics,
+    transitionStatus,
+    authorApproveGalley,
+    authorRequestCorrections,
+    fetchGalleyVersionsForManuscript,
   } = useManuscripts();
 
   const [manuscript, setManuscript] = useState<Manuscript | null>(null);
+  const [latestGalley, setLatestGalley] = useState<GalleyVersion | null>(null);
+  const [latestAuthorRevision, setLatestAuthorRevision] =
+    useState<GalleyVersion | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Author Correction form state
+  const [correctionRemarks, setCorrectionRemarks] = useState("");
+  const [correctionFile, setCorrectionFile] = useState<File | null>(null);
+  const [submittingCorrection, setSubmittingCorrection] = useState(false);
+  const correctionFileRef = useRef<HTMLInputElement>(null);
 
   // Modal states
   const [showMetadataModal, setShowMetadataModal] = useState(false);
@@ -68,16 +86,36 @@ export default function ArticleDetail() {
       setLoading(true);
       const data = await getById(id);
       setManuscript(data);
+      if (data) {
+        const versions = await fetchGalleyVersionsForManuscript(id);
+        if (versions.length > 0) {
+          setLatestGalley(versions[0]); // versions are ordered DESC
+          const authorRev = versions.find(
+            (v) => v.submitter_id === data.submitter_id,
+          );
+          setLatestAuthorRevision(authorRev || null);
+        }
+      }
       setLoading(false);
     }
     fetch();
-  }, [id, getById]);
+  }, [id, getById, fetchGalleyVersionsForManuscript]);
 
   // Refetch helper
   const refetch = async () => {
     if (!id) return;
     const data = await getById(id);
     setManuscript(data);
+    if (data) {
+      const versions = await fetchGalleyVersionsForManuscript(id);
+      if (versions.length > 0) {
+        setLatestGalley(versions[0]);
+        const authorRev = versions.find(
+          (v) => v.submitter_id === data.submitter_id,
+        );
+        setLatestAuthorRevision(authorRev || null);
+      }
+    }
   };
 
   if (loading) {
@@ -104,7 +142,9 @@ export default function ArticleDetail() {
             The manuscript ID "{id}" does not exist.
           </p>
           <button
-            onClick={() => navigate(isAuthor ? "/author" : "/publication/dashboard")}
+            onClick={() =>
+              navigate(isAuthor ? "/author" : "/publication/dashboard")
+            }
             className="px-4 py-2 bg-[#3f4b7e] text-white rounded text-sm font-['Public_Sans',sans-serif] hover:bg-[#3f4b7e]/90 transition-colors"
           >
             Back to Dashboard
@@ -126,7 +166,9 @@ export default function ArticleDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate(isAuthor ? "/author" : "/publication/dashboard")}
+                onClick={() =>
+                  navigate(isAuthor ? "/author" : "/publication/dashboard")
+                }
                 className="p-2 hover:bg-[#f5f5f5] rounded transition-colors"
               >
                 <ArrowLeft className="size-5 text-[#1a1c1c]" />
@@ -148,8 +190,190 @@ export default function ArticleDetail() {
         </div>
       </header>
 
+      {/* ── Author Galley Review — Final Galley Approval Card ── */}
+      {isAuthor &&
+        manuscript.status === "Author Galley Review" &&
+        (() => {
+          return (
+            <div className="mx-8 mt-6 p-6 bg-white border-2 border-[#ffb74d] rounded-lg shadow-md">
+              <div className="flex items-start gap-4">
+                <div className="flex items-center justify-center size-12 bg-[#e65100]/10 rounded-full shrink-0">
+                  <Eye className="size-6 text-[#e65100]" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-['Newsreader',serif] text-[22px] text-[#1a1c1c] mb-1">
+                    Final Galley Approval
+                  </h3>
+                  <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif] mb-5">
+                    Your galley proof has been reviewed by the editorial team.
+                    Please review their remarks below, then approve the galley
+                    or request corrections.
+                  </p>
+
+                  {/* Warning if no galley versions exist */}
+                  {!latestGalley && (
+                    <div className="mb-5 p-4 bg-[#fff3e0] border border-[#ffb74d] rounded-lg flex items-start gap-2">
+                      <AlertCircle className="size-5 text-[#e65100] mt-0.5 shrink-0" />
+                      <p className="text-sm text-[#e65100] font-['Public_Sans',sans-serif]">
+                        No file versions found. Please wait for the editorial
+                        team to upload the galley file.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Editor Remarks & Galley File Section */}
+                  {latestGalley && (
+                    <div className="mb-5 p-4 bg-[#f9fafb] border border-[#e0e0e0] rounded-lg">
+                      {/* Remarks (if any) */}
+                      {manuscript.editor_remarks && (
+                        <div className="mb-4">
+                          <h5 className="text-xs uppercase tracking-wider text-[#3f4b7e] font-['Public_Sans',sans-serif] mb-2 font-semibold">
+                            Editor's Remarks
+                          </h5>
+                          <p className="text-sm text-[#1a1c1c] font-['Public_Sans',sans-serif] whitespace-pre-wrap leading-relaxed">
+                            {manuscript.editor_remarks}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Correction file download */}
+                      <div className="flex items-center gap-2 p-2.5 bg-[#e8eaf6] rounded-lg">
+                        <FileCheck className="size-4 text-[#3f4b7e]" />
+                        <div className="flex flex-col flex-1">
+                          <span className="text-xs font-semibold text-[#1a1c1c] font-['Public_Sans',sans-serif]">
+                            Latest Galley — v{latestGalley.revision_number}
+                          </span>
+                          <span className="text-[10px] text-[#9e9e9e] font-['Public_Sans',sans-serif]">
+                            Uploaded{" "}
+                            {new Date(
+                              latestGalley.submitted_at,
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        <a
+                          href={latestGalley.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium text-[#3f4b7e] underline hover:text-[#3f4b7e]/80 font-['Public_Sans',sans-serif] px-2"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Author Correction Input Area */}
+                  <div className="mt-6 mb-4">
+                    <h4 className="font-['Newsreader',serif] text-[16px] text-[#1a1c1c] mb-2">
+                      Request Corrections
+                    </h4>
+                    <p className="text-xs text-[#6b7280] font-['Public_Sans',sans-serif] mb-3">
+                      If you need to request corrections, please provide remarks
+                      and upload the corrected file.
+                    </p>
+
+                    <textarea
+                      value={correctionRemarks}
+                      onChange={(e) => setCorrectionRemarks(e.target.value)}
+                      placeholder="Describe the corrections needed..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-[#e0e0e0] rounded-lg text-sm font-['Public_Sans',sans-serif] focus:border-[#3f4b7e] focus:outline-none mb-3 resize-none"
+                    />
+
+                    <input
+                      ref={correctionFileRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) =>
+                        setCorrectionFile(e.target.files?.[0] ?? null)
+                      }
+                    />
+                    {correctionFile ? (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-[#e8eaf6] rounded-lg mb-3">
+                        <FileText className="size-4 text-[#3f4b7e]" />
+                        <span className="text-xs text-[#3f4b7e] font-['Public_Sans',sans-serif] flex-1 truncate">
+                          {correctionFile.name}
+                        </span>
+                        <button
+                          onClick={() => setCorrectionFile(null)}
+                          className="p-0.5 hover:bg-[#3f4b7e]/10 rounded"
+                        >
+                          <X className="size-3 text-[#3f4b7e]" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => correctionFileRef.current?.click()}
+                        className="flex items-center gap-2 px-3 py-3 text-xs font-['Public_Sans',sans-serif] text-[#6b7280] border-2 border-dashed border-[#d1d5db] rounded-lg hover:border-[#3f4b7e] hover:text-[#3f4b7e] transition-colors w-full justify-center mb-3"
+                      >
+                        <Upload className="size-4" />
+                        Required: Upload corrected file
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      disabled={
+                        !latestGalley ||
+                        !!correctionFile ||
+                        correctionRemarks.trim() !== ""
+                      }
+                      onClick={async () => {
+                        const success = await authorApproveGalley(
+                          manuscript.id,
+                        );
+                        if (success) await refetch();
+                      }}
+                      className="flex items-center gap-2 px-6 py-3 bg-[#2e7d32] text-white text-sm font-medium font-['Public_Sans',sans-serif] rounded-lg hover:bg-[#2e7d32]/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <CheckCircle2 className="size-4" />
+                      Sign-off &amp; Approve for Publication
+                    </button>
+                    <button
+                      disabled={
+                        !latestGalley ||
+                        !correctionFile ||
+                        !correctionRemarks.trim() ||
+                        submittingCorrection
+                      }
+                      onClick={async () => {
+                        if (!correctionFile || !correctionRemarks.trim())
+                          return;
+                        setSubmittingCorrection(true);
+                        const success = await authorRequestCorrections(
+                          manuscript.id,
+                          correctionFile,
+                          correctionRemarks,
+                        );
+                        setSubmittingCorrection(false);
+                        if (success) {
+                          setCorrectionFile(null);
+                          setCorrectionRemarks("");
+                          await refetch();
+                        }
+                      }}
+                      className="flex items-center gap-2 px-5 py-3 bg-white border border-[#e0e0e0] text-[#6b7280] text-sm font-['Public_Sans',sans-serif] rounded-lg hover:border-[#e65100] hover:text-[#e65100] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RotateCcw className="size-4" />
+                      {submittingCorrection
+                        ? "Uploading..."
+                        : "Request Corrections"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
       {/* Main Workflow Container */}
-      <main className="px-8 py-12">
+      <main className="px-8 py-12 pb-32">
         {/* Workflow Title */}
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-4">
@@ -214,7 +438,11 @@ export default function ArticleDetail() {
               <div className="w-16" />
               <div className="flex-1 bg-white rounded-lg shadow-sm border border-[#e0e0e0] p-6">
                 <ManuscriptPdfViewer
-                  fileUrl={manuscript.file_url}
+                  fileUrl={
+                    latestAuthorRevision
+                      ? latestAuthorRevision.file_url
+                      : manuscript.file_url
+                  }
                   title={`${manuscript.title} manuscript PDF`}
                 />
               </div>
@@ -322,7 +550,12 @@ export default function ArticleDetail() {
                 <div className="flex-1">
                   <IssueAssignment
                     currentAssignment={manuscript.issue_assignment ?? undefined}
-                    onAssign={(val) => assignIssue(manuscript.id, val).then(async (s) => { if (s) await refetch(); return s; })}
+                    onAssign={(val) =>
+                      assignIssue(manuscript.id, val).then(async (s) => {
+                        if (s) await refetch();
+                        return s;
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -427,12 +660,16 @@ export default function ArticleDetail() {
                         <PostPublicationMgmt
                           manuscript={manuscript}
                           onRetractManuscript={async () => {
-                            const success = await retractManuscript(manuscript.id);
+                            const success = await retractManuscript(
+                              manuscript.id,
+                            );
                             if (success) await refetch();
                             return success;
                           }}
                           onReturnToRevision={async () => {
-                            const success = await returnToRevision(manuscript.id);
+                            const success = await returnToRevision(
+                              manuscript.id,
+                            );
                             if (success) await refetch();
                             return success;
                           }}
@@ -453,15 +690,25 @@ export default function ArticleDetail() {
               Notification Log
             </h3>
             <div className="space-y-2 max-h-56 overflow-y-auto">
-              {(manuscript.submission_metadata?.notifications ?? []).map((n) => (
-                <div key={n.id} className="p-2 border border-[#e0e0e0] rounded">
-                  <p className="text-xs uppercase text-[#6b7280]">{n.type}</p>
-                  <p className="text-sm text-[#1a1c1c]">{n.message}</p>
-                  <p className="text-xs text-[#9e9e9e]">{new Date(n.createdAt).toLocaleString()}</p>
-                </div>
-              ))}
-              {(manuscript.submission_metadata?.notifications ?? []).length === 0 && (
-                <p className="text-sm text-[#6b7280]">No notifications recorded yet.</p>
+              {(manuscript.submission_metadata?.notifications ?? []).map(
+                (n) => (
+                  <div
+                    key={n.id}
+                    className="p-2 border border-[#e0e0e0] rounded"
+                  >
+                    <p className="text-xs uppercase text-[#6b7280]">{n.type}</p>
+                    <p className="text-sm text-[#1a1c1c]">{n.message}</p>
+                    <p className="text-xs text-[#9e9e9e]">
+                      {new Date(n.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ),
+              )}
+              {(manuscript.submission_metadata?.notifications ?? []).length ===
+                0 && (
+                <p className="text-sm text-[#6b7280]">
+                  No notifications recorded yet.
+                </p>
               )}
             </div>
           </div>
@@ -476,11 +723,16 @@ export default function ArticleDetail() {
                   <p className="text-xs uppercase text-[#6b7280]">{a.action}</p>
                   <p className="text-sm text-[#1a1c1c]">Actor: {a.actor}</p>
                   {a.note && <p className="text-sm text-[#6b7280]">{a.note}</p>}
-                  <p className="text-xs text-[#9e9e9e]">{new Date(a.createdAt).toLocaleString()}</p>
+                  <p className="text-xs text-[#9e9e9e]">
+                    {new Date(a.createdAt).toLocaleString()}
+                  </p>
                 </div>
               ))}
-              {(manuscript.submission_metadata?.audit_logs ?? []).length === 0 && (
-                <p className="text-sm text-[#6b7280]">No audit entries recorded yet.</p>
+              {(manuscript.submission_metadata?.audit_logs ?? []).length ===
+                0 && (
+                <p className="text-sm text-[#6b7280]">
+                  No audit entries recorded yet.
+                </p>
               )}
             </div>
           </div>
@@ -490,7 +742,8 @@ export default function ArticleDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
-                Submitted: {new Date(manuscript.created_at).toLocaleDateString("en-US", {
+                Submitted:{" "}
+                {new Date(manuscript.created_at).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
@@ -500,18 +753,26 @@ export default function ArticleDetail() {
                 <>
                   <div className="h-4 w-px bg-[#e0e0e0]" />
                   <div className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
-                    Published: {new Date(manuscript.published_at).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    Published:{" "}
+                    {new Date(manuscript.published_at).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      },
+                    )}
                   </div>
                 </>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <div className={`size-2 rounded-full ${isPublished ? "bg-[#2e7d32]" : "bg-[#f57c00]"}`} />
-              <span className={`text-sm font-['Public_Sans',sans-serif] ${isPublished ? "text-[#2e7d32]" : "text-[#f57c00]"}`}>
+              <div
+                className={`size-2 rounded-full ${isPublished ? "bg-[#2e7d32]" : "bg-[#f57c00]"}`}
+              />
+              <span
+                className={`text-sm font-['Public_Sans',sans-serif] ${isPublished ? "text-[#2e7d32]" : "text-[#f57c00]"}`}
+              >
                 {manuscript.status}
               </span>
             </div>

@@ -50,6 +50,20 @@ function getStatusColor(status: ManuscriptStatus) {
       return 'bg-orange-100 text-orange-900';
     case 'Retracted':
       return 'bg-slate-800 text-white';
+    case 'In Layout':
+      return 'bg-purple-100 text-purple-800';
+    case 'Proofreading':
+      return 'bg-teal-100 text-teal-800';
+    case 'Author Galley Review':
+      return 'bg-orange-100 text-orange-800 ring-2 ring-orange-300';
+    case 'Scheduled for Publication':
+      return 'bg-indigo-100 text-indigo-800';
+    case 'In Issue Management':
+      return 'bg-sky-100 text-sky-800';
+    case 'Archived':
+      return 'bg-stone-100 text-stone-700';
+    case 'Declined':
+      return 'bg-red-100 text-red-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
