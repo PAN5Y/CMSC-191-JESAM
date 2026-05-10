@@ -24,6 +24,10 @@ import {
   type ReviewerCandidate,
 } from "@/lib/reviewer-suggestions";
 
+/** JESAM Week 4–10: 3 days for reviewer to confirm, 14 days total for review. */
+const REVIEW_DUE_DAYS = 14;
+const CONFIRMATION_DAYS = 3;
+
 function recommendationShortLabel(r: ReviewerRecommendation): string {
   switch (r) {
     case "accept":
@@ -166,6 +170,7 @@ export default function PeerReviewDashboard() {
     initializeRound,
     addInvitation,
     makeEditorialDecision,
+    completeEditorialReview,
     startPostRevisionPeerReviewRound,
     sendReviewReminder,
   } = usePeerReview();
@@ -179,6 +184,8 @@ export default function PeerReviewDashboard() {
   const [decisionNote, setDecisionNote] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [postRevisionRoundSubmitting, setPostRevisionRoundSubmitting] = useState(false);
+  const [editorialReviewNote, setEditorialReviewNote] = useState("");
+  const [editorialReviewSubmitting, setEditorialReviewSubmitting] = useState(false);
 
   useEffect(() => {
     if (manuscripts.length === 0 || !poolReady) return;
@@ -203,22 +210,30 @@ export default function PeerReviewDashboard() {
           const dueTime = new Date(inv.dueAt).getTime();
           const now = Date.now();
 
-          // A reviewer is considered "failed" if they declined, explicitly expired, OR missed the deadline without submitting.
-          const deadlinePassed = !hasSubmitted && now > dueTime;
-          const isFailed = inv.status === "declined" || inv.status === "expired" || deadlinePassed;
+          // Infer invited-at from dueAt (dueAt = invitedAt + REVIEW_DUE_DAYS)
+          const invitedAt = dueTime - REVIEW_DUE_DAYS * 24 * 60 * 60 * 1000;
+          const confirmationDeadline = invitedAt + CONFIRMATION_DAYS * 24 * 60 * 60 * 1000;
 
-          // 1. Auto-Assign Replacement for Failed Reviewers
+          // Failed = declined | expired | missed deadline | did NOT confirm within 3 days (Find other reviewers)
+          const deadlinePassed = !hasSubmitted && now > dueTime;
+          const unconfirmed = inv.status === "invited" && now > confirmationDeadline;
+          const isFailed = inv.status === "declined" || inv.status === "expired" || deadlinePassed || unconfirmed;
+
+          // 1. Auto-Assign Replacement for Failed/Unconfirmed Reviewers
           if (isFailed) {
             // Check if we already automatically handled this specific failure
             const replacementAlreadyAssigned = auditLogs.some(
               (log) => log.action === 'auto-replacement-assigned' && log.note === inv.id
             );
 
-            // Count how many active invites remain
+            // Count how many active (confirmed, not overdue) invites remain
             const activeInvites = existingInvitations.filter(i => {
               const iHasSubmitted = submissions.some(s => s.reviewerEmail === i.reviewerEmail);
               const iPassed = !iHasSubmitted && now > new Date(i.dueAt).getTime();
-              return i.status !== 'declined' && i.status !== 'expired' && !iPassed;
+              const iInvitedAt = new Date(i.dueAt).getTime() - REVIEW_DUE_DAYS * 24 * 60 * 60 * 1000;
+              const iConfirmDeadline = iInvitedAt + CONFIRMATION_DAYS * 24 * 60 * 60 * 1000;
+              const iUnconfirmed = i.status === 'invited' && now > iConfirmDeadline;
+              return i.status !== 'declined' && i.status !== 'expired' && !iPassed && !iUnconfirmed;
             });
             const targetCount = roundData.targetReviewerCount ?? PEER_REVIEW_TARGET_COUNT;
 
@@ -240,10 +255,9 @@ export default function PeerReviewDashboard() {
               }
             }
           }
-          // 2. Automated Reminders for Active Reviewers
-          else if (!hasSubmitted) {
-            // We send the reminder if they are within 2 days of the deadline
-            const reminderThreshold = dueTime - (2 * 24 * 60 * 60 * 1000);
+          // 2. Automated Reminders for Active Reviewers (within 3 days of deadline)
+          else if (!hasSubmitted && inv.status === "accepted") {
+            const reminderThreshold = dueTime - (3 * 24 * 60 * 60 * 1000);
 
             if (now > reminderThreshold) {
               const reminderAlreadySent = auditLogs.some(
@@ -436,6 +450,24 @@ export default function PeerReviewDashboard() {
     }
   };
 
+  const handleCompleteEditorialReview = async () => {
+    if (!selected || editorialReviewSubmitting) return;
+    if (!editorialReviewNote.trim()) {
+      toast.error("Add a note summarizing the editorial review before completing.");
+      return;
+    }
+    setEditorialReviewSubmitting(true);
+    try {
+      const ok = await completeEditorialReview(selected, editorialReviewNote);
+      if (ok) {
+        toast.success("Editorial review complete. Manuscript accepted — author notified.");
+        setEditorialReviewNote("");
+      }
+    } finally {
+      setEditorialReviewSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 shadow-sm">
@@ -583,6 +615,51 @@ export default function PeerReviewDashboard() {
                   </div>
                 ) : null}
               </header>
+
+              {selected.status === "Editorial Review" ? (
+                <div className="space-y-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                    <h3 className="font-semibold text-gray-900">Editorial Review</h3>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                      Week 4–10 · 1 week
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Peer review approved. Conduct your <strong>1-week editorial review</strong> of all
+                    submitted feedback before formally notifying authors. Once complete, save your notes
+                    below and click <strong>Accept Manuscript</strong> — the manuscript will move to{" "}
+                    <em>Accepted</em> and an author notification will be logged.
+                  </p>
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Editorial review notes (required)
+                    </p>
+                    <textarea
+                      value={editorialReviewNote}
+                      onChange={(e) => setEditorialReviewNote(e.target.value)}
+                      placeholder="Summarize your editorial review findings and the rationale for acceptance…"
+                      rows={4}
+                      disabled={editorialReviewSubmitting}
+                      className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    />
+                    <button
+                      type="button"
+                      disabled={!editorialReviewNote.trim() || editorialReviewSubmitting}
+                      onClick={() => void handleCompleteEditorialReview()}
+                      className="inline-flex items-center justify-center gap-2 min-h-[2.5rem] px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {editorialReviewSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
+                          Completing…
+                        </>
+                      ) : (
+                        "Accept Manuscript — Complete Editorial Review"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               {priorRounds.length > 0 ? (
                 <details

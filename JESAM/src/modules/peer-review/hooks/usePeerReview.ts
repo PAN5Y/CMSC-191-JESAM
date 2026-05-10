@@ -61,7 +61,10 @@ export function usePeerReview() {
   }, [fetchManuscripts]);
 
   const peerReviewManuscripts = manuscripts.filter(
-    (m) => m.status === 'Peer Review' || m.status === 'Revision Requested'
+    (m) =>
+      m.status === 'Peer Review' ||
+      m.status === 'Revision Requested' ||
+      m.status === 'Editorial Review'
   );
 
   const save = useCallback(
@@ -135,7 +138,7 @@ export function usePeerReview() {
         reviewerEmail: reviewer.reviewerEmail,
         reviewerName: reviewer.reviewerName,
         expertise: reviewer.expertise,
-        dueDays: 7,
+        dueDays: 14, // 3 days to confirm + up to 11 days to review (JESAM Week 4–10)
       });
       if (invErr) {
         toast.error(invErr.message);
@@ -289,7 +292,7 @@ export function usePeerReview() {
 
       const nextStatus =
         decision === 'accept'
-          ? 'Accepted'
+          ? 'Editorial Review' // peer-review approved → 1-week editorial check before author notification
           : decision === 'reject'
             ? 'Rejected'
             : decision === 'revise'
@@ -500,6 +503,43 @@ export function usePeerReview() {
     [save, fetchManuscripts]
   );
 
+  /**
+   * Completes the 1-week editorial review stage.
+   * Moves manuscript from 'Editorial Review' → 'Accepted' and appends author notification.
+   */
+  const completeEditorialReview = useCallback(
+    async (manuscript: Manuscript, editorNote: string) => {
+      if (manuscript.status !== 'Editorial Review') {
+        toast.error('Manuscript is not in the Editorial Review stage.');
+        return false;
+      }
+      const nextMeta = mergeSubmissionMeta(
+        manuscript,
+        {
+          notifications: appendNotification(manuscript, {
+            type: 'accepted',
+            recipientRole: 'author',
+            message: `Your manuscript ${
+              manuscript.reference_code ?? manuscript.id
+            } has been accepted for publication after editorial review.`,
+          }),
+          audit_logs: appendAudit(
+            manuscript,
+            'editor',
+            'editorial-review-completed',
+            editorNote
+          ),
+        },
+        true
+      );
+      return save(manuscript.id, {
+        status: 'Accepted',
+        submission_metadata: nextMeta as unknown as Record<string, unknown>,
+      });
+    },
+    [save]
+  );
+
   const sendReviewReminder = useCallback(
     async (manuscript: Manuscript, invitationId: string) => {
       const relational = await manuscriptHasPeerReviewRounds(manuscript.id);
@@ -544,6 +584,7 @@ export function usePeerReview() {
     respondInvitation,
     submitReviewerFeedback,
     makeEditorialDecision,
+    completeEditorialReview,
     startPostRevisionPeerReviewRound,
     sendReviewReminder,
   };
