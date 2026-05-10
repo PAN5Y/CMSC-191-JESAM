@@ -10,14 +10,243 @@
  *  - Assistant messages use a white card with a subtle shadow.
  *  - Both have circular letter avatars.  User avatar shows "A" (for Author /
  *    the logged-in user).  Assistant avatar shows "J" (for JESAM).
- *  - Newlines in the assistant's text are rendered as <br> tags so the
- *    markdown-lite output (bullet lists via •) displays correctly.
+ *  - Assistant text is parsed as Markdown and rendered to HTML so that bold,
+ *    italic, inline code, code blocks, bullet/numbered lists, blockquotes,
+ *    horizontal rules, and highlight marks display correctly.
  *  - The streaming cursor (blinking |) is appended when isStreaming=true.
  *  - Manuscript results are rendered as a compact table below the text.
+ *
+ * MARKDOWN RENDERING:
+ *  We parse the assistant's text with a lightweight, dependency-free inline
+ *  Markdown renderer (no external library required).  Supported syntax:
+ *    **bold**, __bold__
+ *    *italic*, _italic_
+ *    ~~strikethrough~~
+ *    ==highlight==
+ *    `inline code`
+ *    ```language\n…\n``` (fenced code blocks)
+ *    # / ## / ### headings
+ *    > blockquote
+ *    - / * / + unordered list items
+ *    1. ordered list items
+ *    --- / *** horizontal rules
+ *    [text](url) links
+ *    plain URLs auto-linked
+ *  All output is sanitised — only a safe allow-list of HTML tags is used, so
+ *  arbitrary HTML in the model output cannot execute scripts or break layout.
  */
 
-import { Bot, User } from "lucide-react";
+import { useMemo } from "react";
 import type { ChatMessage, ManuscriptSearchResult } from "../types";
+
+// ---------------------------------------------------------------------------
+// Lightweight Markdown → HTML parser (no external deps)
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a Markdown string to a safe HTML string.
+ * Processing order matters: block-level elements are handled first, then
+ * inline formatting is applied to each text node.
+ */
+function markdownToHtml(md: string): string {
+  const lines = md.split("\n");
+  const htmlLines: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // ── Fenced code block ────────────────────────────────────────────────────
+    if (/^```/.test(line)) {
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) {
+        codeLines.push(escapeHtml(lines[i]));
+        i++;
+      }
+      const langAttr = lang ? ` class="language-${escapeHtml(lang)}"` : "";
+      htmlLines.push(
+        `<pre class="md-pre"><code${langAttr}>${codeLines.join("\n")}</code></pre>`
+      );
+      i++; // skip closing ```
+      continue;
+    }
+
+    // ── Horizontal rule ──────────────────────────────────────────────────────
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line.trim())) {
+      htmlLines.push(`<hr class="md-hr" />`);
+      i++;
+      continue;
+    }
+
+    // ── Headings ─────────────────────────────────────────────────────────────
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const text = inlineMarkdown(headingMatch[2]);
+      htmlLines.push(`<h${level} class="md-h${level}">${text}</h${level}>`);
+      i++;
+      continue;
+    }
+
+    // ── Blockquote ───────────────────────────────────────────────────────────
+    if (/^>\s?/.test(line)) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        quoteLines.push(lines[i].replace(/^>\s?/, ""));
+        i++;
+      }
+      const inner = inlineMarkdown(quoteLines.join("\n"));
+      htmlLines.push(`<blockquote class="md-blockquote">${inner}</blockquote>`);
+      continue;
+    }
+
+    // ── Unordered list ───────────────────────────────────────────────────────
+    if (/^[-*+]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*+]\s/.test(lines[i])) {
+        items.push(`<li class="md-li">${inlineMarkdown(lines[i].slice(2).trim())}</li>`);
+        i++;
+      }
+      htmlLines.push(`<ul class="md-ul">${items.join("")}</ul>`);
+      continue;
+    }
+
+    // ── Ordered list ─────────────────────────────────────────────────────────
+    if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        const text = lines[i].replace(/^\d+\.\s/, "").trim();
+        items.push(`<li class="md-li">${inlineMarkdown(text)}</li>`);
+        i++;
+      }
+      htmlLines.push(`<ol class="md-ol">${items.join("")}</ol>`);
+      continue;
+    }
+
+    // ── Blank line → paragraph break (we'll join non-blank lines below) ──────
+    if (line.trim() === "") {
+      htmlLines.push(`<br />`);
+      i++;
+      continue;
+    }
+
+    // ── Regular paragraph line ───────────────────────────────────────────────
+    htmlLines.push(`<p class="md-p">${inlineMarkdown(line)}</p>`);
+    i++;
+  }
+
+  return htmlLines.join("");
+}
+
+/** Apply inline Markdown formatting to a single line of text. */
+function inlineMarkdown(text: string): string {
+  let t = escapeHtml(text);
+
+  // Inline code (must come before bold/italic to protect backtick content)
+  t = t.replace(/`([^`]+)`/g, `<code class="md-code">$1</code>`);
+
+  // Bold — **text** or __text__
+  t = t.replace(/\*\*(.+?)\*\*/g, `<strong class="md-strong">$1</strong>`);
+  t = t.replace(/__(.+?)__/g, `<strong class="md-strong">$1</strong>`);
+
+  // Italic — *text* or _text_ (single, not double)
+  t = t.replace(/\*([^*]+)\*/g, `<em class="md-em">$1</em>`);
+  t = t.replace(/_([^_]+)_/g, `<em class="md-em">$1</em>`);
+
+  // Strikethrough — ~~text~~
+  t = t.replace(/~~(.+?)~~/g, `<s class="md-s">$1</s>`);
+
+  // Highlight — ==text==
+  t = t.replace(/==(.+?)==/g, `<mark class="md-mark">$1</mark>`);
+
+  // Links — [text](url)
+  t = t.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+    `<a class="md-a" href="$2" target="_blank" rel="noopener noreferrer">$1</a>`
+  );
+
+  // Auto-link bare URLs (not already inside an <a>)
+  t = t.replace(
+    /(?<!href=")(https?:\/\/[^\s<"]+)/g,
+    `<a class="md-a" href="$1" target="_blank" rel="noopener noreferrer">$1</a>`
+  );
+
+  return t;
+}
+
+/** Escape HTML special characters so model output cannot inject markup. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ---------------------------------------------------------------------------
+// Markdown styles injected once via a <style> tag
+// ---------------------------------------------------------------------------
+
+const MARKDOWN_STYLES = `
+  .md-prose { font-family: 'Public Sans', sans-serif; font-size: 0.875rem; line-height: 1.65; color: #1f2937; }
+  .md-prose .md-p { margin: 0 0 0.35em; }
+  .md-prose .md-p:last-child { margin-bottom: 0; }
+  .md-prose .md-h1 { font-size: 1.2em; font-weight: 700; margin: 0.6em 0 0.3em; color: #111827; }
+  .md-prose .md-h2 { font-size: 1.1em; font-weight: 700; margin: 0.55em 0 0.25em; color: #1f2937; }
+  .md-prose .md-h3 { font-size: 1em; font-weight: 700; margin: 0.5em 0 0.2em; color: #374151; }
+  .md-prose .md-h4, .md-prose .md-h5, .md-prose .md-h6 { font-size: 0.9em; font-weight: 600; margin: 0.45em 0 0.2em; }
+  .md-prose .md-strong { font-weight: 700; color: #111827; }
+  .md-prose .md-em { font-style: italic; color: #374151; }
+  .md-prose .md-s { text-decoration: line-through; color: #9ca3af; }
+  .md-prose .md-mark { background: #fef08a; color: #713f12; border-radius: 2px; padding: 0 2px; }
+  .md-prose .md-code { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 5px; font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace; font-size: 0.82em; color: #374151; }
+  .md-prose .md-pre { background: #1e293b; border-radius: 8px; padding: 0.85em 1em; margin: 0.5em 0; overflow-x: auto; }
+  .md-prose .md-pre code { background: transparent; border: none; padding: 0; font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace; font-size: 0.82em; color: #e2e8f0; white-space: pre; }
+  .md-prose .md-blockquote { border-left: 3px solid #3f4b7e; margin: 0.4em 0; padding: 0.25em 0.75em; background: #f8f9ff; border-radius: 0 6px 6px 0; color: #4b5563; font-style: italic; }
+  .md-prose .md-ul { margin: 0.3em 0 0.3em 1.15em; padding: 0; list-style-type: disc; }
+  .md-prose .md-ol { margin: 0.3em 0 0.3em 1.15em; padding: 0; list-style-type: decimal; }
+  .md-prose .md-li { margin: 0.15em 0; }
+  .md-prose .md-hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.6em 0; }
+  .md-prose .md-a { color: #3f4b7e; text-decoration: underline; text-underline-offset: 2px; }
+  .md-prose .md-a:hover { color: #2d3659; }
+  .md-cursor { display: inline-block; width: 2px; height: 1em; background: #3f4b7e; margin-left: 2px; vertical-align: text-bottom; animation: md-blink 1s step-start infinite; }
+  @keyframes md-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+`;
+
+let stylesInjected = false;
+function injectStyles() {
+  if (stylesInjected || typeof document === "undefined") return;
+  const style = document.createElement("style");
+  style.textContent = MARKDOWN_STYLES;
+  document.head.appendChild(style);
+  stylesInjected = true;
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: AssistantText (Markdown-rendered)
+// ---------------------------------------------------------------------------
+
+function AssistantText({
+  text,
+  isStreaming,
+}: {
+  text: string;
+  isStreaming?: boolean;
+}) {
+  injectStyles();
+
+  const html = useMemo(() => markdownToHtml(text), [text]);
+
+  return (
+    <div className="md-prose">
+      <span dangerouslySetInnerHTML={{ __html: html }} />
+      {isStreaming && <span className="md-cursor" aria-hidden="true" />}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Sub-component: ManuscriptResultsTable
@@ -75,9 +304,6 @@ function ManuscriptResultsTable({
                   className="text-[#3f4b7e] hover:underline text-xs font-medium"
                   style={{ fontFamily: "'Public Sans', sans-serif" }}
                   onClick={() => {
-                    // TODO: navigate to manuscript detail page
-                    // Using the global router would require importing useNavigate
-                    // from react-router.  For now, we open a placeholder alert.
                     alert(`Navigate to manuscript ${r.referenceCode}`);
                   }}
                 >
@@ -125,37 +351,6 @@ function StatusPill({ label }: { label: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: render assistant text with newline support
-// ---------------------------------------------------------------------------
-
-function AssistantText({
-  text,
-  isStreaming,
-}: {
-  text: string;
-  isStreaming?: boolean;
-}) {
-  // Split on newlines; map blank lines to paragraph gaps.
-  const lines = text.split("\n");
-  return (
-    <p
-      className="text-sm text-gray-800 leading-relaxed"
-      style={{ fontFamily: "'Public Sans', sans-serif" }}
-    >
-      {lines.map((line, i) => (
-        <span key={i}>
-          {line}
-          {i < lines.length - 1 && <br />}
-        </span>
-      ))}
-      {isStreaming && (
-        <span className="inline-block w-0.5 h-4 bg-[#3f4b7e] ml-0.5 animate-pulse" />
-      )}
-    </p>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -187,7 +382,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               <ManuscriptResultsTable results={message.manuscriptResults} />
             )}
 
-            {/* "Found N manuscripts" header when results exist */}
+            {/* Empty results notice */}
             {message.manuscriptResults && message.manuscriptResults.length === 0 && (
               <p
                 className="mt-2 text-xs text-gray-400 italic"
