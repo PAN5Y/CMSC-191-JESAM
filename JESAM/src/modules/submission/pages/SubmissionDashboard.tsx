@@ -340,15 +340,15 @@ export default function SubmissionDashboard() {
             </section>
 
             {dashboard.needsAction.length > 0 && (
-              <section className="bg-white border border-gray-200 rounded-lg p-5">
+              <section className="bg-orange-50/80 border-2 border-orange-200 rounded-lg p-5 shadow-sm">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="font-semibold text-gray-900">Needs your action</h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <h2 className="font-semibold text-orange-950">Needs your action</h2>
+                    <p className="text-sm text-orange-900 mt-1">
                       Manuscripts waiting for your revision or response.
                     </p>
                   </div>
-                  <span className="w-fit rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                  <span className="w-fit rounded-full border border-orange-300 bg-white px-3 py-1 text-xs font-medium text-orange-700">
                     {dashboard.needsAction.length} pending
                   </span>
                 </div>
@@ -358,7 +358,7 @@ export default function SubmissionDashboard() {
                       key={m.id}
                       type="button"
                       onClick={() => navigate("/revision")}
-                      className="text-left rounded-lg border border-gray-200 p-4 hover:border-amber-200 hover:bg-amber-50/40"
+                      className="cursor-pointer text-left rounded-lg border border-orange-200 bg-white p-4 hover:border-orange-300 hover:bg-orange-50"
                     >
                       <p className="text-sm font-medium text-gray-900 line-clamp-1">{m.title}</p>
                       <p className="text-xs text-gray-500 mt-1">

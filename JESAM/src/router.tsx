@@ -6,12 +6,14 @@ import RegisterPage from "./modules/auth/RegisterPage";
 import UnauthorizedPage from "./components/auth/UnauthorizedPage";
 import PublicationDashboard from "./modules/publication-impact/pages/PublicationDashboard";
 import ProductionPreReviewDashboard from "./modules/production/pages/ProductionPreReviewDashboard";
+import ProductionPreReviewDetail from "./modules/production/pages/ProductionPreReviewDetail";
 import ArticleDetail from "./modules/publication-impact/pages/ArticleDetail";
 import PublicArticlePage from "./modules/publication-impact/pages/PublicArticlePage";
 import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard";
 import SubmissionWorkflow from "./modules/submission/pages/SubmissionWorkflow";
 import EditorDashboard from "./modules/submission/pages/EditorDashboard";
 import EditorInChiefDashboard from "./modules/submission/pages/EditorInChiefDashboard";
+import ScreeningManuscriptDetail from "./modules/submission/pages/ScreeningManuscriptDetail";
 import PeerReviewDashboard from "./modules/peer-review/pages/PeerReviewDashboard";
 import ReviewerPortal from "./modules/peer-review/pages/ReviewerPortal";
 import RevisionDashboard from "./modules/revision/pages/RevisionDashboard";
@@ -123,6 +125,17 @@ export const router = createBrowserRouter([
     ],
   },
 
+  {
+    path: "/submission/screening/:id",
+    element: <ProtectedRoute allowedRoles={["editor_in_chief", "managing_editor", "system_admin"]} />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <ScreeningManuscriptDetail /> }],
+      },
+    ],
+  },
+
   // ── Publication / Production routes ──
   {
     path: "/production/pre-review",
@@ -135,6 +148,21 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [{ index: true, element: <ProductionPreReviewDashboard /> }],
+      },
+    ],
+  },
+
+  {
+    path: "/production/pre-review/:id",
+    element: (
+      <ProtectedRoute
+        allowedRoles={["production_editor", "technical_editor", "system_admin"]}
+      />
+    ),
+    children: [
+      {
+        element: <AppLayout />,
+        children: [{ index: true, element: <ProductionPreReviewDetail /> }],
       },
     ],
   },

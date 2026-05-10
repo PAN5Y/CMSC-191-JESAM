@@ -85,6 +85,106 @@ async function runTemplateCheck(
   return payload.report as TemplateCheckReport;
 }
 
+async function runPdfTemplateCheck(
+  storagePath: string,
+  manuscriptId: string | undefined,
+  extractedText?: string
+): Promise<{ report: TemplateCheckReport; extractedText: string }> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/check-pdf-template`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${session?.access_token ?? supabaseAnonKey}`,
+    },
+    body: JSON.stringify({
+      manuscriptId,
+      storagePath,
+      extractedText,
+    }),
+  });
+
+  const rawPayload = await response.text();
+  let payload: { error?: unknown; report?: unknown; extractedText?: unknown } = {};
+
+  try {
+    payload = rawPayload ? JSON.parse(rawPayload) : {};
+  } catch {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      typeof payload.error === "string"
+        ? payload.error
+        : `PDF template check failed with status ${response.status}.`
+            + (rawPayload ? ` ${rawPayload}` : "")
+    );
+  }
+
+  if (!payload.report) {
+    throw new Error("PDF template check returned no report.");
+  }
+
+  return {
+    report: payload.report as TemplateCheckReport,
+    extractedText: typeof payload.extractedText === "string" ? payload.extractedText : "",
+  };
+}
+
+async function extractPdfText(file: File): Promise<string> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const worker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs?url");
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await pdfjs.getDocument({
+    data,
+    disableFontFace: true,
+    useSystemFonts: true,
+  }).promise;
+  const pageTexts: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const textContent = await page.getTextContent({
+      disableNormalization: false,
+      includeMarkedContent: false,
+    });
+    const rows = new Map<number, Array<{ x: number; text: string }>>();
+    for (const item of textContent.items) {
+      if (!("str" in item) || !item.str.trim()) continue;
+      const transform = Array.isArray(item.transform) ? item.transform : [];
+      const x = Number(transform[4] ?? 0);
+      const y = Number(transform[5] ?? 0);
+      const rowKey = Math.round(y / 3) * 3;
+      const row = rows.get(rowKey) ?? [];
+      row.push({ x, text: item.str });
+      rows.set(rowKey, row);
+    }
+    const pageText = [...rows.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([, row]) =>
+        row
+          .sort((a, b) => a.x - b.x)
+          .map((part) => part.text)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter(Boolean)
+      .join("\n");
+    if (pageText) pageTexts.push(pageText);
+  }
+
+  return pageTexts.join("\n\n").trim();
+}
+
 /** Simulated intake checks for revised files (proposal §2.1-style QA). */
 export async function runAutomatedChecksSimulation(
   file: File,
@@ -112,10 +212,23 @@ export async function runAutomatedChecksSimulation(
   setPhase("formatting", "checking", "Verifying template adherence...");
   let templateReport: TemplateCheckReport | undefined;
   const storagePath = options.storagePath ?? storagePathFromPublicUrl(options.fileUrl);
+  const lowerName = file.name.toLowerCase();
+  const lowerStoragePath = storagePath?.toLowerCase() ?? "";
+  const isPdf =
+    lowerName.endsWith(".pdf") ||
+    lowerStoragePath.endsWith(".pdf") ||
+    file.type === "application/pdf";
 
   if (storagePath) {
     try {
-      templateReport = await runTemplateCheck(storagePath, options.manuscriptId);
+      if (isPdf) {
+        fullText = await extractPdfText(file);
+        const pdfResult = await runPdfTemplateCheck(storagePath, options.manuscriptId, fullText);
+        templateReport = pdfResult.report;
+        fullText = fullText || pdfResult.extractedText;
+      } else {
+        templateReport = await runTemplateCheck(storagePath, options.manuscriptId);
+      }
 
       setPhase(
         "formatting",
@@ -138,7 +251,11 @@ export async function runAutomatedChecksSimulation(
     setPhase("formatting", "checking", "Extracting text and verifying format...");
   }
   try {
-    if (file.name.toLowerCase().endsWith(".docx")) {
+    if (fullText) {
+      if (!storagePath) {
+        setPhase("formatting", "passed", "Template structure looks valid.");
+      }
+    } else if (file.name.toLowerCase().endsWith(".docx")) {
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
       fullText = result.value;

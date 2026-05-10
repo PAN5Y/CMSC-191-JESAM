@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.104.1",
+    "pdfjs-dist": "npm:pdfjs-dist@^5.4.394",
+    "pako": "npm:pako@^2.1.0"
+  }
+}

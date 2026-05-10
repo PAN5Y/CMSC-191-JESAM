@@ -251,6 +251,12 @@ export function useSubmissions() {
                 .filter(Boolean)
                 .join("\n\n")
             : "Your manuscript passed initial editorial screening and was forwarded to production checks.";
+        const approvalMessage = [
+          "Your manuscript passed initial editorial screening and was forwarded to production checks.",
+          comments ? `Editorial comments: ${comments}` : undefined,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
         const submission_metadata = {
           ...prevMeta,
           ...metaPatch,
@@ -258,7 +264,7 @@ export function useSubmissions() {
             type: "screening-decision",
             recipientRole: "author",
             recipientEmail: existing ? getCorrespondingAuthorEmail(existing) : undefined,
-            message: authorMessage,
+            message: decision.decision === "approve" ? approvalMessage : authorMessage,
           }),
           audit_logs: appendAudit(
             existing ?? ({} as Manuscript),
@@ -266,7 +272,7 @@ export function useSubmissions() {
             "screening-decision",
             decision.decision === "reject"
               ? [decision.rejectionReason, comments].filter(Boolean).join(" - ")
-              : decision.decision
+              : [decision.decision, comments].filter(Boolean).join(" - ")
           ),
         } as SubmissionMetadata;
 

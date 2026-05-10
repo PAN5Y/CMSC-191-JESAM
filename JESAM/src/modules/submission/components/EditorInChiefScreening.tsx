@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Info } from "lucide-react";
 import type { Manuscript } from "@/types";
-import { ManuscriptDetailsModal } from "./ManuscriptDetailsModal";
 import type { ScreeningDecision } from "../types";
 
 interface EditorInChiefScreeningProps {
@@ -12,10 +11,10 @@ interface EditorInChiefScreeningProps {
 
 export function EditorInChiefScreening({
   manuscripts,
-  decidedBy,
-  onScreeningSubmit,
+  decidedBy: _decidedBy,
+  onScreeningSubmit: _onScreeningSubmit,
 }: EditorInChiefScreeningProps) {
-  const [selectedManuscript, setSelectedManuscript] = useState<Manuscript | null>(null);
+  const navigate = useNavigate();
 
   const getClassificationColor = (classification: string | null) => {
     switch (classification) {
@@ -108,7 +107,7 @@ export function EditorInChiefScreening({
                       <div className="flex items-center gap-2 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => setSelectedManuscript(manuscript)}
+                          onClick={() => navigate(`/submission/screening/${manuscript.id}`)}
                           className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                         >
                           View details
@@ -122,18 +121,6 @@ export function EditorInChiefScreening({
           </table>
         </div>
       </div>
-
-      {selectedManuscript && (
-        <ManuscriptDetailsModal
-          manuscript={selectedManuscript}
-          decidedBy={decidedBy}
-          onClose={() => setSelectedManuscript(null)}
-          onSubmitScreening={async (decision) => {
-            await onScreeningSubmit(decision);
-            setSelectedManuscript(null);
-          }}
-        />
-      )}
     </div>
   );
 }
