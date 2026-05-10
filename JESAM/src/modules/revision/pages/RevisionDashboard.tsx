@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AutomatedCheckSnapshot } from "@/types";
+import { ManuscriptTracker } from "../components/ManuscriptTracker";
 import { RevisionAutomatedChecks } from "../components/RevisionAutomatedChecks";
 import {
   intakeReturnedAuthorResubmitGoesToFormatQueue,
@@ -102,7 +103,9 @@ export default function RevisionDashboard() {
                   <p className="text-sm font-medium text-gray-900">{m.reference_code ?? m.id.slice(0, 8)}</p>
                   <p className="text-xs text-gray-600 line-clamp-2">{m.title}</p>
                   <p className="text-xs mt-1">
-                    {needs ? (
+                    {manuscriptNeedsEditorialReview(m) ? (
+                      <span className="text-purple-700 font-medium">Editorial action required</span>
+                    ) : needs ? (
                       <span className="text-amber-800 font-medium">Action required</span>
                     ) : (
                       <span className="text-gray-500">History · {m.status}</span>
@@ -122,6 +125,8 @@ export default function RevisionDashboard() {
             <p className="text-sm text-gray-500">Select a manuscript to open revision actions.</p>
           ) : (
             <>
+              {isEditorialUser && <ManuscriptTracker manuscript={selected} />}
+
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">{selected.title}</h2>
                 <p className="text-sm text-gray-600">Current status: {selected.status}</p>

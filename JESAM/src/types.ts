@@ -113,7 +113,7 @@ export interface PeerReviewRound {
   targetReviewerCount: number;
   invitations: ReviewInvitation[];
   submissions: ReviewSubmission[];
-  editorDecision?: "accept" | "revise" | "reject" | "additional-reviewer";
+  editorDecision?: "approved" | "reject" | "additional-reviewer" | "accept" | "revise";
   editorDecisionNote?: string;
   decidedAt?: string;
 }

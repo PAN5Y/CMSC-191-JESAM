@@ -284,26 +284,24 @@ export function usePeerReview() {
   const makeEditorialDecision = useCallback(
     async (
       manuscript: Manuscript,
-      decision: 'accept' | 'revise' | 'reject' | 'additional-reviewer',
+      decision: 'approved' | 'reject' | 'additional-reviewer',
       note: string
     ) => {
       const active = activeRoundNumber(manuscript);
       const relational = await manuscriptHasPeerReviewRounds(manuscript.id);
 
       const nextStatus =
-        decision === 'accept'
-          ? 'Accepted'
+        decision === 'approved'
+          ? 'Editorial Review'
           : decision === 'reject'
             ? 'Rejected'
-            : decision === 'revise'
-              ? 'Editorial Review'
-              : 'Peer Review';
+            : 'Peer Review';
 
       if (relational) {
         const { error: decErr } = await updateRoundEditorDecision(
           manuscript.id,
           active,
-          decision,
+          decision as Parameters<typeof updateRoundEditorDecision>[2],
           note
         );
         if (decErr) {
@@ -333,7 +331,7 @@ export function usePeerReview() {
           manuscript,
           {
             notifications: appendNotification(manuscript, {
-              type: decision === 'revise' ? 'revision-requested' : 'screening-decision',
+              type: decision === 'approved' ? 'revision-requested' : 'screening-decision',
               recipientRole: 'author',
               message: `Editorial decision: ${decision} for ${manuscript.reference_code ?? manuscript.id}.`,
             }),
@@ -376,7 +374,7 @@ export function usePeerReview() {
         {
           peer_review: nextPeer,
           notifications: appendNotification(manuscript, {
-            type: decision === 'revise' ? 'revision-requested' : 'screening-decision',
+            type: decision === 'approved' ? 'revision-requested' : 'screening-decision',
             recipientRole: 'author',
             message: `Editorial decision: ${decision} for ${manuscript.reference_code ?? manuscript.id}.`,
           }),
