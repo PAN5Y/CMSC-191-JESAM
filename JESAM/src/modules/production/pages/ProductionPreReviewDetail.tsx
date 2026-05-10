@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useManuscripts } from "@/modules/publication-impact/hooks/useManuscripts";
 import { runAutomatedChecksSimulation, SIMILARITY_THRESHOLD_PERCENT } from "@/lib/automated-checks-runner";
 import { appendAudit, appendNotification, getCorrespondingAuthorEmail } from "@/lib/workflow";
+import { sendProductionRejectionEmail } from "@/lib/workflow-email";
 
 type Decision = "peer-review" | "revision" | "reject";
 
@@ -76,6 +77,10 @@ async function fileFromUrl(url: string, fallbackName: string): Promise<File> {
 
 function formatSubject(value: string | undefined) {
   return value?.trim() ? value.replace(/-/g, " ") : "Not provided";
+}
+
+function isUsableEmail(value: string | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
 
 export default function ProductionPreReviewDetail() {
@@ -188,12 +193,22 @@ export default function ProductionPreReviewDetail() {
       };
       const note = decisionNote.trim();
       const checkSummary = summarizeChecks(checks);
+      const rejectionFeedback = note
+        ? `Production Editor comments:\n${note}\n\nCheck results:\n${checkSummary}`
+        : checkSummary;
       const authorMessage =
         decision === "revision"
           ? `${messageByDecision.revision}\n\nProduction Editor comments:\n${note || "No additional comments provided."}\n\nCheck results:\n${checkSummary}`
           : decision === "reject"
             ? `${messageByDecision.reject}\n\nProduction Editor comments:\n${note || "No additional comments provided."}\n\nCheck results:\n${checkSummary}`
             : messageByDecision[decision];
+      const technicalEditorMessage = [
+        `${manuscript.reference_code ?? manuscript.id.slice(0, 8)} is ready for peer review facilitation.`,
+        "Production checks cleared. Please assign reviewers and manage the peer-review round.",
+        note ? `Production Editor turnover note: ${note}` : undefined,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       const prevMeta = manuscript.submission_metadata ?? {};
       const submission_metadata: SubmissionMetadata = {
@@ -202,10 +217,14 @@ export default function ProductionPreReviewDetail() {
         production_decision_comments: note || undefined,
         production_check_summary: checkSummary,
         rejection_reason: decision === "reject" ? note || "Rejected after production checks" : prevMeta.rejection_reason,
-        rejection_comments: decision === "reject" ? note || checkSummary : prevMeta.rejection_comments,
+        rejection_comments: decision === "reject" ? rejectionFeedback : prevMeta.rejection_comments,
         notifications:
           decision === "peer-review"
-            ? prevMeta.notifications
+            ? appendNotification(manuscript, {
+                type: "review-invitation",
+                recipientRole: "technical_editor",
+                message: technicalEditorMessage,
+              })
             : appendNotification(manuscript, {
                 type: decision === "reject" ? "screening-decision" : "revision-requested",
                 recipientRole: "author",
@@ -226,6 +245,30 @@ export default function ProductionPreReviewDetail() {
       });
       if (success) {
         toast.success(messageByDecision[decision]);
+        if (decision === "reject") {
+          const recipientEmail = getCorrespondingAuthorEmail(manuscript);
+          if (isUsableEmail(recipientEmail)) {
+            void (async () => {
+              const { error: emailError } = await sendProductionRejectionEmail({
+                manuscript,
+                to: recipientEmail,
+                comments: note,
+                checkSummary,
+                decidedBy: user?.email ?? undefined,
+              });
+
+              if (emailError) {
+                toast.warning(
+                  `Decision saved, but production rejection email was not sent: ${emailError.message}`
+                );
+              } else {
+                toast.success(`Production rejection email sent to ${recipientEmail}.`);
+              }
+            })();
+          } else {
+            toast.warning("Decision saved, but no valid corresponding author email was found.");
+          }
+        }
         navigate("/production/pre-review");
       }
     } finally {
@@ -451,17 +494,21 @@ export default function ProductionPreReviewDetail() {
           </div>
 
           <aside className="space-y-6">
-            <div className="rounded-lg border border-gray-200 bg-white p-5">
-              <h2 className="font-semibold text-gray-900">Decision note</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Included in audit logs and author notifications for return/reject decisions.
+            <div className="rounded-lg border-2 border-orange-300 bg-orange-50 p-5 shadow-sm ring-1 ring-orange-100">
+              <h2 className="font-semibold text-orange-950">Decision / turnover note</h2>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-orange-800">
+                Optional
+              </p>
+              <p className="mt-2 text-sm text-orange-900">
+                Included in audit logs, author notifications for return/reject decisions, and the
+                Technical Editor handoff when the manuscript moves to peer review.
               </p>
               <textarea
                 value={decisionNote}
                 onChange={(e) => setDecisionNote(e.target.value)}
                 rows={5}
-                placeholder="Production Editor comments..."
-                className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="Production Editor comments or handoff notes..."
+                className="mt-3 w-full rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200"
               />
             </div>
 

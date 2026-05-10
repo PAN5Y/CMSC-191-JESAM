@@ -15,6 +15,7 @@ import type {
 } from "@/types";
 import type { ScreeningDecision } from "../types";
 import { appendAudit, appendNotification, getCorrespondingAuthorEmail } from "@/lib/workflow";
+import { sendScreeningRejectionEmail } from "@/lib/workflow-email";
 
 export interface CreateManuscriptFromWizardInput {
   metadata: {
@@ -58,6 +59,10 @@ function buildSubmissionMetadata(input: CreateManuscriptFromWizardInput): Submis
     author_details: input.authors,
     declarations: input.declarations,
   };
+}
+
+function isUsableEmail(value: string | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
 
 export function useSubmissions() {
@@ -284,7 +289,7 @@ export function useSubmissions() {
         if (upErr) {
           setError(upErr.message);
           toast.error(upErr.message);
-          return;
+          return false;
         }
 
         setManuscripts((prev) =>
@@ -296,6 +301,31 @@ export function useSubmissions() {
         );
         setError(null);
         toast.success("Screening decision recorded.");
+        if (decision.decision === "reject" && existing) {
+          const recipientEmail = getCorrespondingAuthorEmail(existing);
+          if (isUsableEmail(recipientEmail)) {
+            void (async () => {
+              const { error: emailError } = await sendScreeningRejectionEmail({
+                manuscript: existing,
+                to: recipientEmail,
+                reason: decision.rejectionReason,
+                comments,
+                decidedBy: decision.decidedBy,
+              });
+
+              if (emailError) {
+                toast.warning(
+                  `Decision saved, but rejection email was not sent: ${emailError.message}`
+                );
+              } else {
+                toast.success(`Rejection email sent to ${recipientEmail}.`);
+              }
+            })();
+          } else {
+            toast.warning("Decision saved, but no valid corresponding author email was found.");
+          }
+        }
+        return true;
       } finally {
         setLoading(false);
       }

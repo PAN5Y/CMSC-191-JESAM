@@ -15,7 +15,7 @@ interface ScreeningDecisionModalProps {
   decidedBy: string;
   onClose: () => void;
   onBack: () => void;
-  onSubmit: (decision: ScreeningDecision) => Promise<void>;
+  onSubmit: (decision: ScreeningDecision) => Promise<unknown>;
 }
 
 export function ScreeningDecisionModal({

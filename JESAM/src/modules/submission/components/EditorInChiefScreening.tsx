@@ -6,7 +6,7 @@ import type { ScreeningDecision } from "../types";
 interface EditorInChiefScreeningProps {
   manuscripts: Manuscript[];
   decidedBy: string;
-  onScreeningSubmit: (decision: ScreeningDecision) => Promise<void>;
+  onScreeningSubmit: (decision: ScreeningDecision) => Promise<unknown>;
 }
 
 export function EditorInChiefScreening({

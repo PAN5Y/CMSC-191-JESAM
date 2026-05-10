@@ -1,10 +1,14 @@
-import { CheckCircle2, Info, FileText, Mail } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Info, FileText, Mail, X } from "lucide-react";
 
 interface SubmissionSuccessProps {
   referenceCode: string;
   manuscriptUuid: string;
   title: string;
   submittedAt: string;
+  acknowledgementUrl?: string;
+  acknowledgementFilename?: string;
+  acknowledgementEmailStatus?: "idle" | "sending" | "sent" | "failed";
   onGoToDashboard: () => void;
   onViewSubmission: () => void;
 }
@@ -14,9 +18,13 @@ export function SubmissionSuccess({
   manuscriptUuid,
   title,
   submittedAt,
+  acknowledgementUrl,
+  acknowledgementFilename,
+  acknowledgementEmailStatus = "idle",
   onGoToDashboard,
   onViewSubmission,
 }: SubmissionSuccessProps) {
+  const [showAcknowledgement, setShowAcknowledgement] = useState(Boolean(acknowledgementUrl));
   const dateSubmitted = new Date(submittedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -148,9 +156,28 @@ export function SubmissionSuccess({
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start gap-3">
             <Mail className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-800">
-              When email notifications are enabled, a confirmation will be sent to your registered address.
-            </p>
+            <div className="text-sm text-blue-800">
+              <p>
+                Your acknowledgement of submission has been generated
+                {acknowledgementEmailStatus === "sent"
+                  ? " and emailed to the corresponding author."
+                  : acknowledgementEmailStatus === "sending"
+                    ? " and is being emailed to the corresponding author."
+                    : acknowledgementEmailStatus === "failed"
+                      ? ". The email could not be sent, but the generated PDF is available below."
+                      : "."}
+              </p>
+              {acknowledgementUrl && (
+                <button
+                  type="button"
+                  onClick={() => setShowAcknowledgement(true)}
+                  className="mt-2 inline-flex items-center gap-2 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  View acknowledgement PDF
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -176,6 +203,33 @@ export function SubmissionSuccess({
           You can track your manuscript status anytime from your dashboard.
         </p>
       </div>
+
+      {showAcknowledgement && acknowledgementUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">Acknowledgement of Submission</h3>
+                <p className="text-xs text-gray-500">
+                  {acknowledgementFilename ?? "submission-acknowledgement.pdf"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAcknowledgement(false)}
+                className="rounded-md p-1 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <iframe
+              src={acknowledgementUrl}
+              title="Acknowledgement of submission PDF"
+              className="h-[75vh] w-full bg-gray-100"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -417,6 +417,8 @@ export default function PeerReviewDashboard() {
     selected?.submission_metadata?.revision_cycle?.rounds?.length ?? 0;
   const manuscriptFileVersionLabel =
     revisionRoundCount > 0 ? revisionRoundCount + 1 : 1;
+  const productionTurnoverNote = selected?.submission_metadata?.production_decision_comments;
+  const productionCheckSummary = selected?.submission_metadata?.production_check_summary;
 
   const handleStartPostRevisionRound = async () => {
     if (!selected || postRevisionRoundSubmitting) return;
@@ -564,6 +566,29 @@ export default function PeerReviewDashboard() {
                       <span className="text-gray-500 text-xs ml-2">
                         ({revisionRoundCount} revision upload{revisionRoundCount === 1 ? "" : "s"} on file)
                       </span>
+                    ) : null}
+                  </div>
+                ) : null}
+                {productionTurnoverNote?.trim() || productionCheckSummary?.trim() ? (
+                  <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50/80 px-4 py-3 text-sm text-cyan-950">
+                    <p className="font-semibold">Production handoff context</p>
+                    {productionTurnoverNote?.trim() ? (
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-cyan-800">
+                          Production Editor turnover note
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-gray-900">{productionTurnoverNote}</p>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-cyan-900">No turnover note was provided by Production.</p>
+                    )}
+                    {productionCheckSummary?.trim() ? (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-cyan-800">
+                          Production check summary
+                        </summary>
+                        <p className="mt-2 whitespace-pre-wrap text-gray-800">{productionCheckSummary}</p>
+                      </details>
                     ) : null}
                   </div>
                 ) : null}

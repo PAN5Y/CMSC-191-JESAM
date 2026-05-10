@@ -32,3 +32,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/check-pdf-template/deno.json"
 entrypoint = "./functions/check-pdf-template/index.ts"
+
+[functions.send-workflow-email]
+enabled = true
+verify_jwt = false
+import_map = "./functions/send-workflow-email/deno.json"
+entrypoint = "./functions/send-workflow-email/index.ts"

@@ -9,7 +9,7 @@ interface ManuscriptDetailsModalProps {
   manuscript: Manuscript;
   decidedBy: string;
   onClose: () => void;
-  onSubmitScreening: (decision: ScreeningDecision) => Promise<void>;
+  onSubmitScreening: (decision: ScreeningDecision) => Promise<unknown>;
 }
 
 export function ManuscriptDetailsModal({
