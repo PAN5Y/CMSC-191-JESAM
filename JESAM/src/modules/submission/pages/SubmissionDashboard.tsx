@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { SubmissionsTable } from '../components/SubmissionsTable';
 import { useSubmissions } from '../hooks/useSubmissions';
-import { AlertCircle, CheckCircle2, Clock3, FileText, Plus, XCircle } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle2, Clock3, FileText, Lightbulb, Plus, Tag, XCircle } from 'lucide-react';
 import type { Manuscript, ManuscriptStatus } from '@/types';
 import { getAuthorDecisionFeedback } from '@/lib/manuscript-feedback';
 
@@ -27,6 +27,18 @@ function statusCount(manuscripts: Manuscript[], statuses: ManuscriptStatus[]) {
   return manuscripts.filter((m) => statuses.includes(m.status)).length;
 }
 
+function topEntries(values: string[], limit = 5) {
+  const counts = new Map<string, number>();
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit);
+}
+
 export default function SubmissionDashboard() {
   const navigate = useNavigate();
   const { manuscripts, loading, error, fetchManuscripts } = useSubmissions();
@@ -49,6 +61,27 @@ export default function SubmissionDashboard() {
     const rejected = manuscripts.filter((m) => m.status === "Rejected");
     const inReview = manuscripts.filter((m) => m.status === "Peer Review");
     const rejectedWithFeedback = rejected.filter((m) => getAuthorDecisionFeedback(m)?.comments);
+    const impactTotals = published.reduce(
+      (acc, m) => {
+        acc.views += m.metrics?.views ?? 0;
+        acc.downloads += m.metrics?.downloads ?? 0;
+        acc.citations += m.metrics?.citations ?? 0;
+        return acc;
+      },
+      { views: 0, downloads: 0, citations: 0 }
+    );
+    const topKeywords = topEntries(manuscripts.flatMap((m) => m.keywords), 6);
+    const subjectAreas = topEntries(
+      manuscripts.map((m) => m.submission_metadata?.subjectArea ?? ""),
+      4
+    );
+    const missingIndexingInfo = manuscripts.filter((m) => {
+      const authorDetails = m.submission_metadata?.author_details ?? [];
+      return (
+        m.keywords.length < 3 ||
+        authorDetails.some((author) => !author.orcid?.trim() || !author.affiliation.trim())
+      );
+    });
     const newest = [...manuscripts]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 3);
@@ -63,6 +96,10 @@ export default function SubmissionDashboard() {
       rejected,
       rejectedWithFeedback,
       inReview,
+      impactTotals,
+      topKeywords,
+      subjectAreas,
+      missingIndexingInfo,
       newest,
       oldestActive,
       intake: statusCount(manuscripts, ["Initial Screening", "Production Checks", "For Format Revision"]),
@@ -171,6 +208,87 @@ export default function SubmissionDashboard() {
                 );
               })}
             </section>
+
+            <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-5 xl:col-span-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Personal knowledge profile</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Themes and indexing signals from your own manuscript history.
+                    </p>
+                  </div>
+                  <Tag className="w-5 h-5 text-blue-600 shrink-0" />
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm font-medium text-gray-900">Frequent keywords</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {dashboard.topKeywords.map(([keyword, count]) => (
+                        <span key={keyword} className="rounded-full bg-blue-50 border border-blue-100 px-3 py-1 text-xs text-blue-700">
+                          {keyword} ({count})
+                        </span>
+                      ))}
+                      {dashboard.topKeywords.length === 0 && (
+                        <p className="text-sm text-gray-500">Add keywords to submitted manuscripts to build this profile.</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm font-medium text-gray-900">Subject concentration</p>
+                    <div className="mt-3 space-y-2">
+                      {dashboard.subjectAreas.map(([subject, count]) => (
+                        <div key={subject} className="flex items-center justify-between text-sm">
+                          <span className="capitalize text-gray-700">{subject.replace(/-/g, " ")}</span>
+                          <span className="font-semibold text-gray-900">{count}</span>
+                        </div>
+                      ))}
+                      {dashboard.subjectAreas.length === 0 && (
+                        <p className="text-sm text-gray-500">Subject areas will appear after submission.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Published impact</h2>
+                    <p className="text-sm text-gray-600 mt-1">Private author view of public article reach.</p>
+                  </div>
+                  <BarChart3 className="w-5 h-5 text-green-600 shrink-0" />
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[
+                    ["Views", dashboard.impactTotals.views],
+                    ["Downloads", dashboard.impactTotals.downloads],
+                    ["Citations", dashboard.impactTotals.citations],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg border border-gray-200 p-3 text-center">
+                      <p className="text-lg font-semibold text-gray-900">{value}</p>
+                      <p className="text-[11px] text-gray-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {dashboard.missingIndexingInfo.length > 0 && (
+              <section className="bg-blue-50 border border-blue-100 rounded-lg p-5">
+                <div className="flex items-start gap-3">
+                  <Lightbulb className="w-5 h-5 text-blue-700 mt-0.5 shrink-0" />
+                  <div>
+                    <h2 className="font-semibold text-blue-950">Indexing readiness reminders</h2>
+                    <p className="text-sm text-blue-900 mt-1">
+                      {dashboard.missingIndexingInfo.length} manuscript(s) may need stronger metadata:
+                      at least three keywords, complete affiliations, and ORCID where available. This
+                      helps JESAM surface stronger author and topic knowledge later.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
 
             <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="bg-white rounded-lg border border-gray-200 p-5 xl:col-span-2">

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { BarChart3, BookOpen, Tag } from "lucide-react";
 import { useManuscripts } from "../hooks/useManuscripts";
 import ManuscriptCard from "../components/ManuscriptCard";
 import type { ManuscriptStatus } from "../types";
@@ -16,6 +17,18 @@ const statusTabs: {
   { label: "Published", value: "Published" },
   { label: "Archived / Declined", value: "terminal" },
 ];
+
+function topEntries(values: string[], limit = 5) {
+  const counts = new Map<string, number>();
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit);
+}
 
 export default function PublicationDashboard() {
   const {
@@ -76,6 +89,26 @@ export default function PublicationDashboard() {
         m.file_url &&
         m.doi,
     );
+    const impactTotals = published.reduce(
+      (acc, m) => {
+        acc.views += m.metrics?.views ?? 0;
+        acc.downloads += m.metrics?.downloads ?? 0;
+        acc.citations += m.metrics?.citations ?? 0;
+        return acc;
+      },
+      { views: 0, downloads: 0, citations: 0 },
+    );
+    const topPublished = [...published]
+      .sort(
+        (a, b) =>
+          ((b.metrics?.views ?? 0) + (b.metrics?.downloads ?? 0) + (b.metrics?.citations ?? 0) * 5) -
+          ((a.metrics?.views ?? 0) + (a.metrics?.downloads ?? 0) + (a.metrics?.citations ?? 0) * 5),
+      )
+      .slice(0, 4);
+    const keywordStats = topEntries(manuscripts.flatMap((m) => m.keywords), 6);
+    const needsDiscoverability = manuscripts.filter(
+      (m) => m.keywords.length < 3 || !m.doi || !m.file_url || !m.issue_assignment,
+    );
     return {
       accepted,
       inProduction,
@@ -83,6 +116,10 @@ export default function PublicationDashboard() {
       needsDoi,
       needsFile,
       readyToPublish,
+      impactTotals,
+      topPublished,
+      keywordStats,
+      needsDiscoverability,
     };
   }, [manuscripts]);
 
@@ -148,6 +185,111 @@ export default function PublicationDashboard() {
             );
           })}
         </div>
+
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg border border-[#e0e0e0] p-5 xl:col-span-2">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-['Newsreader',serif] text-[20px] text-[#1a1c1c]">
+                  Publication knowledge signals
+                </h3>
+                <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif] mt-1">
+                  Production-facing cues for discoverability, issue planning, and JESAM impact reporting.
+                </p>
+              </div>
+              <BookOpen className="size-5 text-[#3f4b7e] shrink-0" />
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-[#e0e0e0] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Tag className="size-4 text-[#3f4b7e]" />
+                  <p className="text-sm font-medium text-[#1a1c1c] font-['Public_Sans',sans-serif]">
+                    Production keywords
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {dashboard.keywordStats.map(([keyword, count]) => (
+                    <span key={keyword} className="rounded-full bg-[#f5f5f5] border border-[#e0e0e0] px-3 py-1 text-xs text-[#1a1c1c]">
+                      {keyword} ({count})
+                    </span>
+                  ))}
+                  {dashboard.keywordStats.length === 0 && (
+                    <p className="text-sm text-[#6b7280]">No keyword signals yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#e0e0e0] p-4">
+                <p className="text-sm font-medium text-[#1a1c1c] font-['Public_Sans',sans-serif] mb-3">
+                  Discoverability blockers
+                </p>
+                <div className="space-y-2 text-sm font-['Public_Sans',sans-serif]">
+                  <div className="flex justify-between">
+                    <span className="text-[#6b7280]">Needs DOI</span>
+                    <span className="font-semibold text-[#1a1c1c]">{dashboard.needsDoi.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#6b7280]">Needs file</span>
+                    <span className="font-semibold text-[#1a1c1c]">{dashboard.needsFile.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#6b7280]">Needs issue/indexing polish</span>
+                    <span className="font-semibold text-[#1a1c1c]">{dashboard.needsDiscoverability.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#6b7280]">Ready to publish</span>
+                    <span className="font-semibold text-[#1a1c1c]">{dashboard.readyToPublish.length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-[#e0e0e0] p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-['Newsreader',serif] text-[20px] text-[#1a1c1c]">
+                  Published impact
+                </h3>
+                <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif] mt-1">
+                  Signals useful for promotion and public visibility.
+                </p>
+              </div>
+              <BarChart3 className="size-5 text-[#3f4b7e] shrink-0" />
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                ["Views", dashboard.impactTotals.views],
+                ["Downloads", dashboard.impactTotals.downloads],
+                ["Citations", dashboard.impactTotals.citations],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-[#e0e0e0] p-3 text-center">
+                  <p className="text-lg font-semibold text-[#1a1c1c] font-['Public_Sans',sans-serif]">
+                    {value}
+                  </p>
+                  <p className="text-[11px] text-[#6b7280] font-['Public_Sans',sans-serif]">{label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 space-y-2">
+              {dashboard.topPublished.map((m) => (
+                <div key={m.id} className="rounded-lg border border-[#e0e0e0] p-3">
+                  <p className="text-sm font-medium text-[#1a1c1c] line-clamp-1 font-['Public_Sans',sans-serif]">
+                    {m.title}
+                  </p>
+                  <p className="text-xs text-[#6b7280] mt-1 font-['Public_Sans',sans-serif]">
+                    {(m.metrics?.views ?? 0).toLocaleString()} views · {(m.metrics?.downloads ?? 0).toLocaleString()} downloads · {(m.metrics?.citations ?? 0).toLocaleString()} citations
+                  </p>
+                </div>
+              ))}
+              {dashboard.topPublished.length === 0 && (
+                <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
+                  Published article rankings will appear once metrics exist.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
 
         {/* Section title */}
         <div className="mb-6">

@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { EditorInChiefScreening } from '../components/EditorInChiefScreening';
 import { useSubmissions } from '../hooks/useSubmissions';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertCircle, CheckCircle2, Clock3, FileSearch, XCircle } from 'lucide-react';
+import { AlertCircle, BarChart3, CheckCircle2, Clock3, FileSearch, Tags, Users, XCircle } from 'lucide-react';
 import type { Manuscript } from '@/types';
 
 const SCREENING_STATUSES = ['Initial Screening', 'Editor In Chief Screening'] as const;
@@ -14,6 +14,18 @@ function daysSince(date: string) {
 
 function oldest(list: Manuscript[]) {
   return [...list].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
+}
+
+function topEntries(values: string[], limit = 5) {
+  const counts = new Map<string, number>();
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit);
 }
 
 export default function EditorInChiefDashboard() {
@@ -35,6 +47,25 @@ export default function EditorInChiefDashboard() {
     const rejected = manuscripts.filter((m) => m.status === 'Rejected');
     const published = manuscripts.filter((m) => m.status === 'Published');
     const agedScreening = manuscriptsForScreening.filter((m) => daysSince(m.created_at) >= 3);
+    const topKeywords = topEntries(manuscripts.flatMap((m) => m.keywords), 6);
+    const focusStats = topEntries(manuscripts.map((m) => m.classification ?? ''), 4);
+    const subjectStats = topEntries(
+      manuscripts.map((m) => m.submission_metadata?.subjectArea ?? ''),
+      5
+    );
+    const institutionStats = topEntries(
+      manuscripts.flatMap((m) =>
+        (m.submission_metadata?.author_details ?? []).map((author) => author.affiliation)
+      ),
+      5
+    );
+    const similarityScores = manuscripts
+      .map((m) => m.submission_metadata?.similarity_score)
+      .filter((score): score is number => typeof score === 'number');
+    const averageSimilarity =
+      similarityScores.length > 0
+        ? Math.round(similarityScores.reduce((sum, score) => sum + score, 0) / similarityScores.length)
+        : null;
     const newestScreening = [...manuscriptsForScreening]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 4);
@@ -45,6 +76,11 @@ export default function EditorInChiefDashboard() {
       rejected,
       published,
       agedScreening,
+      topKeywords,
+      focusStats,
+      subjectStats,
+      institutionStats,
+      averageSimilarity,
       oldestScreening: oldest(manuscriptsForScreening),
       newestScreening,
       decidedTotal: productionChecks.length + peerReview.length + rejected.length + published.length,
@@ -127,6 +163,77 @@ export default function EditorInChiefDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-lg border border-gray-200 p-5 lg:col-span-2">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-gray-900">Submission knowledge signals</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Corpus-level patterns to guide screening, reviewer planning, and SESAM reporting.
+                </p>
+              </div>
+              <Tags className="w-5 h-5 text-blue-600 shrink-0" />
+            </div>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-sm font-medium text-gray-900">Emerging keywords</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {dashboard.topKeywords.map(([keyword, count]) => (
+                    <span key={keyword} className="rounded-full bg-blue-50 border border-blue-100 px-3 py-1 text-xs text-blue-700">
+                      {keyword} ({count})
+                    </span>
+                  ))}
+                  {dashboard.topKeywords.length === 0 && (
+                    <p className="text-sm text-gray-500">No keyword patterns yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-sm font-medium text-gray-900">Focus area mix</p>
+                <div className="mt-3 space-y-2">
+                  {dashboard.focusStats.map(([focus, count]) => (
+                    <div key={focus} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{focus}</span>
+                      <span className="font-semibold text-gray-900">{count}</span>
+                    </div>
+                  ))}
+                  {dashboard.focusStats.length === 0 && (
+                    <p className="text-sm text-gray-500">No classifications recorded yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-gray-900">Screening quality pulse</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Signals from automated checks and submitter metadata.
+                </p>
+              </div>
+              <BarChart3 className="w-5 h-5 text-green-600 shrink-0" />
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span>Average similarity</span>
+                <span className="font-semibold">
+                  {dashboard.averageSimilarity ?? "No data"}{dashboard.averageSimilarity !== null ? "%" : ""}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Subject areas tracked</span>
+                <span className="font-semibold">{dashboard.subjectStats.length}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Affiliations represented</span>
+                <span className="font-semibold">{dashboard.institutionStats.length}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-5 lg:col-span-2">
             <h2 className="font-semibold text-gray-900">Screening priorities</h2>
             <p className="text-sm text-gray-600 mt-1">
               Manuscripts that should be reviewed first based on age in the queue.
@@ -167,6 +274,45 @@ export default function EditorInChiefDashboard() {
                   {manuscripts.filter((m) => !['Rejected', 'Published', 'Retracted'].includes(m.status)).length}
                 </span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-5 h-5 text-gray-600" />
+              <h2 className="font-semibold text-gray-900">Active submitter institutions</h2>
+            </div>
+            <div className="space-y-2">
+              {dashboard.institutionStats.map(([institution, count]) => (
+                <div key={institution} className="flex items-center justify-between gap-4 text-sm">
+                  <span className="text-gray-700 line-clamp-1">{institution}</span>
+                  <span className="font-semibold text-gray-900">{count}</span>
+                </div>
+              ))}
+              {dashboard.institutionStats.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  Affiliation data will appear after author metadata is captured.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-900 mb-3">Subject area demand</h2>
+            <div className="space-y-2">
+              {dashboard.subjectStats.map(([subject, count]) => (
+                <div key={subject} className="flex items-center justify-between gap-4 text-sm">
+                  <span className="capitalize text-gray-700">{subject.replace(/-/g, " ")}</span>
+                  <span className="font-semibold text-gray-900">{count}</span>
+                </div>
+              ))}
+              {dashboard.subjectStats.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  Subject-area analytics will appear as submissions arrive.
+                </p>
+              )}
             </div>
           </div>
         </div>

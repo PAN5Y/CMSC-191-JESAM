@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, FileSearch, Loader2, RotateCcw, Send, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, FileSearch, Loader2, RotateCcw, Send, Tags, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import ManuscriptPdfViewer from "@/components/common/ManuscriptPdfViewer";
 import StatusBadge from "@/components/common/StatusBadge";
@@ -56,6 +56,18 @@ function getLatestProductionFileUrl(manuscript: Manuscript) {
   return latestRevision?.fileUrl || manuscript.file_url || null;
 }
 
+function topEntries(values: string[], limit = 5) {
+  const counts = new Map<string, number>();
+  values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit);
+}
+
 async function fileFromUrl(url: string, fallbackName: string): Promise<File> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -101,8 +113,36 @@ export default function ProductionPreReviewDashboard() {
     const oldest = [...manuscripts].sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     )[0];
+    const keywordStats = topEntries(manuscripts.flatMap((m) => m.keywords), 6);
+    const subjectStats = topEntries(
+      manuscripts.map((m) => m.submission_metadata?.subjectArea ?? ""),
+      5
+    );
+    const similarityScores = manuscripts
+      .map((m) => m.submission_metadata?.similarity_score)
+      .filter((score): score is number => typeof score === "number");
+    const averageSimilarity =
+      similarityScores.length > 0
+        ? Math.round(similarityScores.reduce((sum, score) => sum + score, 0) / similarityScores.length)
+        : null;
+    const metadataReady = manuscripts.filter(
+      (m) =>
+        m.keywords.length >= 3 &&
+        !!m.submission_metadata?.subjectArea &&
+        (m.submission_metadata?.author_details ?? []).every((author) => author.affiliation.trim())
+    );
 
-    return { unchecked, checked, failed, returnedRevision, oldest };
+    return {
+      unchecked,
+      checked,
+      failed,
+      returnedRevision,
+      oldest,
+      keywordStats,
+      subjectStats,
+      averageSimilarity,
+      metadataReady,
+    };
   }, [manuscripts]);
 
   const runChecks = async (manuscript: Manuscript) => {
@@ -288,6 +328,79 @@ export default function ProductionPreReviewDashboard() {
                   <p className="text-xs text-gray-500 mt-1">{detail}</p>
                 </div>
               ))}
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-5 lg:col-span-2">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Pre-review knowledge signals</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Topic and metadata patterns visible to production before peer review routing.
+                    </p>
+                  </div>
+                  <Tags className="w-5 h-5 text-blue-600 shrink-0" />
+                </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm font-medium text-gray-900">Queued keywords</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {dashboard.keywordStats.map(([keyword, count]) => (
+                        <span key={keyword} className="rounded-full bg-blue-50 border border-blue-100 px-3 py-1 text-xs text-blue-700">
+                          {keyword} ({count})
+                        </span>
+                      ))}
+                      {dashboard.keywordStats.length === 0 && (
+                        <p className="text-sm text-gray-500">No queued keyword patterns yet.</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <p className="text-sm font-medium text-gray-900">Subject areas in checks</p>
+                    <div className="mt-3 space-y-2">
+                      {dashboard.subjectStats.map(([subject, count]) => (
+                        <div key={subject} className="flex items-center justify-between text-sm">
+                          <span className="capitalize text-gray-700">{subject.replace(/-/g, " ")}</span>
+                          <span className="font-semibold text-gray-900">{count}</span>
+                        </div>
+                      ))}
+                      {dashboard.subjectStats.length === 0 && (
+                        <p className="text-sm text-gray-500">Subject areas will appear after metadata capture.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Indexing readiness</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Metadata quality before manuscripts leave production checks.
+                    </p>
+                  </div>
+                  <BarChart3 className="w-5 h-5 text-green-600 shrink-0" />
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Metadata-ready</span>
+                    <span className="font-semibold">
+                      {dashboard.metadataReady.length}/{manuscripts.length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Average similarity</span>
+                    <span className="font-semibold">
+                      {dashboard.averageSimilarity ?? "No data"}{dashboard.averageSimilarity !== null ? "%" : ""}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Checks with issues</span>
+                    <span className="font-semibold">{dashboard.failed.length}</span>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
