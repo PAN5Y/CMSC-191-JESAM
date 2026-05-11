@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import { Settings, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSidebarItems } from '@/lib/nav-permissions';
@@ -10,19 +10,17 @@ export default function Sidebar() {
   return (
     <aside className="w-full md:w-64 bg-[#3f4b7e] text-white flex flex-col md:fixed md:h-screen z-40">
       {/* Branding */}
-      <div className="p-6 border-b border-white/10">
-        <img
-          src="logos\UPLB LOGO w SESAM White text.png"
-          alt="UPLB School of Environmental Science and Management"
-          width={2281}
-          height={627}
-          className="h-auto w-full max-w-[208px] object-contain"
-        />
-        <h1 className="font-['Newsreader',serif] text-[22px] text-white mt-4 mb-1">JESAM</h1>
-        <p className="text-[10px] text-white/70 font-['Public_Sans',sans-serif]">
-          Journal of Environmental Science and Management
-        </p>
-      </div>
+       <Link to="/home" className="p-6 border-b border-white/10 hover:bg-white/5 transition-colors cursor-pointer block">
+          <img
+            src="logos\UPLB LOGO w SESAM White text.png"
+            alt="UPLB School of Environmental Science and Management"
+            className="h-auto w-full max-w-[208px] object-contain"
+          />
+          <h1 className="font-['Newsreader',serif] text-[22px] text-white mt-4 mb-1">JESAM</h1>
+          <p className="text-[10px] text-white/70 font-['Public_Sans',sans-serif]">
+            Journal of Environmental Science and Management
+          </p>
+        </Link>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 overflow-x-auto md:overflow-visible">

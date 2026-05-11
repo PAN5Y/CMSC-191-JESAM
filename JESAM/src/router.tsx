@@ -22,6 +22,7 @@ import AnalyticsDashboard from "./modules/analytics-dashboard/pages/AnalyticsDas
 import AIChatbotPage from "./modules/ai-chatbot/pages/AIChatbotPage";
 import { useAuth } from "./contexts/AuthContext";
 import { getWorkspaceHomePath } from "./lib/workspace-routing";
+import LandingPage from "./modules/public/LandingPage";
 
 function InternalHomeRedirect() {
   const { role } = useAuth();
@@ -35,6 +36,7 @@ function InternalHomeRedirect() {
 
 export const router = createBrowserRouter([
   // ── Public routes (no auth required) ──
+  {path: "/home", element: <LandingPage />},
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
