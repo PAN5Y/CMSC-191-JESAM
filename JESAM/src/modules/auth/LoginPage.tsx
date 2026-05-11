@@ -54,7 +54,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
           <div className="w-full max-w-md">
             <img
-              src="/UPLB LOGO w SESAM.png"
+              src="logos/UPLB LOGO w SESAM.png"
               alt="UPLB School of Environmental Science and Management"
               width={2281}
               height={627}
