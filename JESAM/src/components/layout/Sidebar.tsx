@@ -12,7 +12,7 @@ export default function Sidebar() {
       {/* Branding */}
       <div className="p-6 border-b border-white/10">
         <img
-          src="logos\UPLB LOGO w SESAM White text.png"
+          src="/logos/UPLB LOGO w SESAM White text.png"
           alt="UPLB School of Environmental Science and Management"
           width={2281}
           height={627}
