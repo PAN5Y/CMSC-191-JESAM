@@ -98,10 +98,9 @@ function mapRoundFromDbRow(row: Record<string, unknown>): PeerReviewRound {
 
   const editorDecision = row.editor_decision as string | null | undefined;
   const decision =
-    editorDecision === "accept" ||
-    editorDecision === "revise" ||
-    editorDecision === "reject" ||
-    editorDecision === "additional-reviewer"
+    editorDecision === "minor-revision" ||
+    editorDecision === "major-revision" ||
+    editorDecision === "reject"
       ? editorDecision
       : undefined;
 
@@ -442,7 +441,7 @@ export async function insertReviewSubmission(
 export async function updateRoundEditorDecision(
   manuscriptId: string,
   roundNumber: number,
-  decision: "accept" | "revise" | "reject" | "additional-reviewer",
+  decision: "minor-revision" | "major-revision" | "reject",
   note: string
 ): Promise<{ error: Error | null }> {
   const decidedAt = new Date().toISOString();
@@ -572,7 +571,7 @@ export async function fetchReviewerAssignmentsFromDb(
 
   if (error) return { data: [], error: new Error(error.message) };
 
-  const statuses = new Set(["Peer Review", "Revision Requested"]);
+  const statuses = new Set(["Peer Review", "Editorial Review", "Revision Requested"]);
   const rows: ReviewerAssignmentRow[] = [];
 
   for (const raw of data ?? []) {

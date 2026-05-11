@@ -33,6 +33,11 @@ const statusConfig: Partial<
     text: "text-[#3949ab]",
     label: "Peer Review",
   },
+  "Editorial Review": {
+    bg: "bg-[#f3e5f5]",
+    text: "text-[#6a1b9a]",
+    label: "Editorial Review",
+  },
   "Returned to Author": {
     bg: "bg-[#fff8e1]",
     text: "text-[#f57f17]",

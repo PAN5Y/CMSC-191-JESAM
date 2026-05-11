@@ -10,11 +10,16 @@ export type ManuscriptStatus =
   | "Production Checks"
   | "For Format Revision"
   | "Peer Review"
+  | "Peer Review in Progress"
+  | "Review Conducted"
+  | "Editorial Review"
   | "Revision Requested"
+  | "Checking"
   | "Returned to Author"
   | "Rejected"
   | "Editorial Review"
   | "Accepted"
+  | "In Layout"
   | "In Production"
   | "In Layout"
   | "Proofreading"
@@ -173,7 +178,7 @@ export interface PeerReviewRound {
   targetReviewerCount: number;
   invitations: ReviewInvitation[];
   submissions: ReviewSubmission[];
-  editorDecision?: "accept" | "revise" | "reject" | "additional-reviewer";
+  editorDecision?: "minor-revision" | "major-revision" | "reject";
   editorDecisionNote?: string;
   decidedAt?: string;
 }
@@ -229,6 +234,21 @@ export interface SubmissionMetadata {
     ethicalStandards?: boolean;
     dataAvailability?: boolean;
     authorshipContribution?: boolean;
+  };
+  editorial_review?: {
+    summary: string;
+    majorConcerns: string;
+    minorConcerns: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+  };
+  checking_review?: {
+    summary: string;
+    majorConcerns: string;
+    minorConcerns: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+    decision: "approve" | "send-back";
   };
   screening_comments?: string;
   rejection_reason?: string;

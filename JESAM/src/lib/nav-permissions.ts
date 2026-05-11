@@ -79,7 +79,9 @@ export function getSidebarItems(
   if (role === "technical_editor") {
     return [
       { icon: Users, label: "Peer Review", to: "/peer-review" },
+      { icon: Edit, label: "Revision", to: "/revision" },
       { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
   }
