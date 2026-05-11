@@ -45,27 +45,52 @@ function blobToBase64(blob: Blob) {
 async function loadHeaderDataUrl() {
   const response = await fetch("/logos/header.png");
   if (!response.ok) throw new Error(`Could not load certificate header (${response.status}).`);
-  const blob = await response.blob();
+  const buffer = await response.arrayBuffer();
+  const signature = Array.from(new Uint8Array(buffer.slice(0, 8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  if (signature !== "89504e470d0a1a0a") {
+    throw new Error("Certificate header is not a valid PNG file.");
+  }
+
+  const blob = new Blob([buffer], { type: "image/png" });
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read header image."));
-    reader.readAsDataURL(blob);
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Could not prepare certificate header image."));
+        return;
+      }
+      ctx.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not decode certificate header image."));
+    };
+    image.src = url;
   });
 }
 
-function drawWrappedText(
-  doc: jsPDF,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  options?: { align?: "left" | "center" | "right" | "justify" }
-) {
-  const lines = doc.splitTextToSize(text, maxWidth) as string[];
-  doc.text(lines, x, y, options);
-  return y + lines.length * lineHeight;
+function drawFallbackHeader(doc: jsPDF, pageWidth: number) {
+  doc.setFont("times", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(0, 92, 64);
+  doc.text("School of Environmental Science and Management", pageWidth / 2, 76, {
+    align: "center",
+  });
+  doc.setTextColor(128, 24, 55);
+  doc.setFontSize(12);
+  doc.text("University of the Philippines Los Banos", pageWidth / 2, 94, {
+    align: "center",
+  });
+  doc.setTextColor(0, 0, 0);
 }
 
 function drawBodyParagraph(doc: jsPDF, text: string, x: number, y: number, maxWidth: number) {
@@ -79,7 +104,6 @@ export async function generateReviewerCertificatePdf(
 ): Promise<ReviewerCertificatePdf> {
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const header = await loadHeaderDataUrl();
   const date = new Date(input.completedAtIso).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -96,7 +120,13 @@ export async function generateReviewerCertificatePdf(
     author: "Journal of Environmental Science and Management",
   });
 
-  doc.addImage(header, "PNG", 54, 36, pageWidth - 108, 96);
+  try {
+    const header = await loadHeaderDataUrl();
+    doc.addImage(header, "PNG", 54, 36, pageWidth - 108, 96);
+  } catch (error) {
+    console.error("Could not embed certificate header image:", error);
+    drawFallbackHeader(doc, pageWidth);
+  }
   doc.setDrawColor(61, 74, 107);
   doc.setLineWidth(1.2);
   doc.line(72, 146, pageWidth - 72, 146);
