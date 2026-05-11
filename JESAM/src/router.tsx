@@ -25,10 +25,23 @@ import { getWorkspaceHomePath } from "./lib/workspace-routing";
 import LandingPage from "./modules/public/LandingPage";
 
 function InternalHomeRedirect() {
-  const { role } = useAuth();
+  const { role, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
+        <div className="text-center">
+          <div className="size-8 border-3 border-[#3f4b7e]/20 border-t-[#3f4b7e] rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
+            Loading...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!role) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <Navigate to={getWorkspaceHomePath(role)} replace />;
@@ -36,7 +49,8 @@ function InternalHomeRedirect() {
 
 export const router = createBrowserRouter([
   // ── Public routes (no auth required) ──
-  {path: "/home", element: <LandingPage />},
+  { path: "/", element: <InternalHomeRedirect /> },
+  { path: "/home", element: <LandingPage /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
@@ -71,35 +85,6 @@ export const router = createBrowserRouter([
   },
 
   // ── Internal landing (role-aware) ──
-  {
-    path: "/",
-    element: (
-      <ProtectedRoute
-        allowedRoles={[
-          "production_editor",
-          "technical_editor",
-          "reviewer",
-          "managing_editor",
-          "associate_editor",
-          "technical_editor",
-          "editor_in_chief",
-          "system_admin",
-        ]}
-      />
-    ),
-    children: [
-      {
-        element: <AppLayout />,
-        children: [
-          {
-            index: true,
-            element: <InternalHomeRedirect />,
-          },
-        ],
-      },
-    ],
-  },
-
   // ── Submission support view (non-EIC) ──
   {
     path: "/submission/queue",
