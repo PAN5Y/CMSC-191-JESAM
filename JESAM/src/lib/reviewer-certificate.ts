@@ -43,7 +43,7 @@ function blobToBase64(blob: Blob) {
 }
 
 async function loadHeaderDataUrl() {
-  const response = await fetch("/header.png");
+  const response = await fetch("/logos/header.png");
   if (!response.ok) throw new Error(`Could not load certificate header (${response.status}).`);
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
