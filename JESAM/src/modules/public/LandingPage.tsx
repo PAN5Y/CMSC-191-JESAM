@@ -76,7 +76,7 @@ const LandingPage = () => {
               </button>
             </Link>
 
-            <Link to="/submit" className="h-full">
+            <Link to="/login" className="h-full">
               <button className="w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-white/30 text-white font-bold rounded hover:bg-white/10 transition flex items-center justify-center gap-3">
                 <Upload className="w-5 h-5" /> SUBMIT NOW
               </button>
