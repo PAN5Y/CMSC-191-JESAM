@@ -19,6 +19,7 @@ export type UserRole = AppRole;
 export const EDITOR_ROLES: UserRole[] = [
   "production_editor",
   "managing_editor",
+  "technical_editor",
   "associate_editor",
   "editor_in_chief",
   "system_admin",

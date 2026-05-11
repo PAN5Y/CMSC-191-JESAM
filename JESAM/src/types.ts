@@ -7,11 +7,15 @@ export type ManuscriptStatus =
   | "Pending Format Verification"
   | "Editor In Chief Screening"
   | "Peer Review"
+  | "Peer Review in Progress"
+  | "Review Conducted"
   | "Editorial Review"
   | "Revision Requested"
+  | "Checking"
   | "Returned to Author"
   | "Rejected"
   | "Accepted"
+  | "In Layout"
   | "In Production"
   | "Published"
   | "Return to Revision"
@@ -31,6 +35,7 @@ export type AppRole =
   | "reviewer"
   | "associate_editor"
   | "managing_editor"
+  | "technical_editor"
   | "production_editor"
   | "editor_in_chief"
   | "system_admin";
@@ -113,7 +118,7 @@ export interface PeerReviewRound {
   targetReviewerCount: number;
   invitations: ReviewInvitation[];
   submissions: ReviewSubmission[];
-  editorDecision?: "approved" | "reject" | "additional-reviewer" | "accept" | "revise";
+  editorDecision?: "minor-revision" | "major-revision" | "reject";
   editorDecisionNote?: string;
   decidedAt?: string;
 }
@@ -168,6 +173,21 @@ export interface SubmissionMetadata {
     ethicalStandards?: boolean;
     dataAvailability?: boolean;
     authorshipContribution?: boolean;
+  };
+  editorial_review?: {
+    summary: string;
+    majorConcerns: string;
+    minorConcerns: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+  };
+  checking_review?: {
+    summary: string;
+    majorConcerns: string;
+    minorConcerns: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+    decision: "approve" | "send-back";
   };
   screening_comments?: string;
   rejection_reason?: string;

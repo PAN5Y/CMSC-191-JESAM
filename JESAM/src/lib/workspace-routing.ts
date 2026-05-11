@@ -11,5 +11,6 @@ export function getWorkspaceHomePath(role: AppRole): string {
   if (role === "associate_editor" || role === "managing_editor" || role === "system_admin") {
     return "/submission/queue";
   }
+  if (role === "technical_editor") return "/revision";
   return "/author";
 }

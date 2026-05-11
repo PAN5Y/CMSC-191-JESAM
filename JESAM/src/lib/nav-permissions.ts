@@ -64,6 +64,15 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
     ];
   }
 
+  if (role === "technical_editor") {
+    return [
+      { icon: Users, label: "Peer Review", to: "/peer-review" },
+      { icon: Edit, label: "Revision", to: "/revision" },
+      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
+    ];
+  }
+
   if (role === "production_editor") {
     return [
       { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },

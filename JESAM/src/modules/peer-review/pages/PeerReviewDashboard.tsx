@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePeerReview } from "../hooks/usePeerReview";
 import {
   manuscriptAwaitingEditorialReReviewAfterRevision,
@@ -23,6 +24,10 @@ import {
   rankReviewersForManuscript,
   type ReviewerCandidate,
 } from "@/lib/reviewer-suggestions";
+
+/** 3 days to confirm invitation, 14 days total for review (JESAM Week 4–10). */
+const REVIEW_DUE_DAYS = 14;
+const CONFIRMATION_DAYS = 3;
 
 function recommendationShortLabel(r: ReviewerRecommendation): string {
   switch (r) {
@@ -59,14 +64,12 @@ function invitationForSubmission(
 
 function editorDecisionLabel(d: NonNullable<PeerReviewRound["editorDecision"]>): string {
   switch (d) {
-    case "approved":
-    case "accept":
-    case "revise":
-      return "Approved — sent to editorial review";
+    case "minor-revision":
+      return "Minor revision — sent to editorial review";
+    case "major-revision":
+      return "Major revision — returned to author for full re-review";
     case "reject":
       return "Rejected";
-    case "additional-reviewer":
-      return "Request additional reviewer (new round)";
     default:
       return d;
   }
@@ -160,7 +163,12 @@ function RoundSubmittedReviewsList({ round }: { round: PeerReviewRound }) {
   );
 }
 
+const PEER_REVIEW_MANAGE_ROLES = new Set(["technical_editor", "editor_in_chief", "system_admin"]);
+
 export default function PeerReviewDashboard() {
+  const { role } = useAuth();
+  const canManage = role ? PEER_REVIEW_MANAGE_ROLES.has(role) : false;
+
   const {
     manuscripts,
     initializeRound,
@@ -173,9 +181,7 @@ export default function PeerReviewDashboard() {
   const [poolReady, setPoolReady] = useState(false);
   const [reviewerSource, setReviewerSource] = useState<"database" | "fallback">("fallback");
   const [selectedId, setSelectedId] = useState<string>("");
-  const [decision, setDecision] = useState<"approved" | "reject" | "additional-reviewer">(
-    "approved"
-  );
+  const [decision, setDecision] = useState<"minor-revision" | "major-revision" | "reject">("minor-revision");
   const [decisionNote, setDecisionNote] = useState("");
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [postRevisionRoundSubmitting, setPostRevisionRoundSubmitting] = useState(false);
@@ -203,22 +209,29 @@ export default function PeerReviewDashboard() {
           const dueTime = new Date(inv.dueAt).getTime();
           const now = Date.now();
 
-          // A reviewer is considered "failed" if they declined, explicitly expired, OR missed the deadline without submitting.
-          const deadlinePassed = !hasSubmitted && now > dueTime;
-          const isFailed = inv.status === "declined" || inv.status === "expired" || deadlinePassed;
+          // Infer invitedAt from dueAt (dueAt = invitedAt + REVIEW_DUE_DAYS)
+          const invitedAt = dueTime - REVIEW_DUE_DAYS * 24 * 60 * 60 * 1000;
+          const confirmationDeadline = invitedAt + CONFIRMATION_DAYS * 24 * 60 * 60 * 1000;
 
-          // 1. Auto-Assign Replacement for Failed Reviewers
+          // Failed = declined | expired | missed deadline | did not confirm within 3 days
+          const deadlinePassed = !hasSubmitted && now > dueTime;
+          const unconfirmed = inv.status === "invited" && now > confirmationDeadline;
+          const isFailed = inv.status === "declined" || inv.status === "expired" || deadlinePassed || unconfirmed;
+
+          // 1. Auto-Assign Replacement for Failed/Unconfirmed Reviewers
           if (isFailed) {
-            // Check if we already automatically handled this specific failure
             const replacementAlreadyAssigned = auditLogs.some(
               (log) => log.action === 'auto-replacement-assigned' && log.note === inv.id
             );
 
-            // Count how many active invites remain
+            // Count active invites: confirmed, not overdue, not unconfirmed
             const activeInvites = existingInvitations.filter(i => {
               const iHasSubmitted = submissions.some(s => s.reviewerEmail === i.reviewerEmail);
               const iPassed = !iHasSubmitted && now > new Date(i.dueAt).getTime();
-              return i.status !== 'declined' && i.status !== 'expired' && !iPassed;
+              const iInvitedAt = new Date(i.dueAt).getTime() - REVIEW_DUE_DAYS * 24 * 60 * 60 * 1000;
+              const iConfirmDeadline = iInvitedAt + CONFIRMATION_DAYS * 24 * 60 * 60 * 1000;
+              const iUnconfirmed = i.status === 'invited' && now > iConfirmDeadline;
+              return i.status !== 'declined' && i.status !== 'expired' && !iPassed && !iUnconfirmed;
             });
             const targetCount = roundData.targetReviewerCount ?? PEER_REVIEW_TARGET_COUNT;
 
@@ -228,7 +241,6 @@ export default function PeerReviewDashboard() {
                 const added = await addInvitation(m, nextReviewer);
                 if (added) {
                   replacementsAssigned++;
-                  // Manually push a local audit log so we don't spam in the same loop
                   auditLogs.push({
                     id: "temp-" + Date.now(),
                     createdAt: new Date().toISOString(),
@@ -240,10 +252,9 @@ export default function PeerReviewDashboard() {
               }
             }
           }
-          // 2. Automated Reminders for Active Reviewers
-          else if (!hasSubmitted) {
-            // We send the reminder if they are within 2 days of the deadline
-            const reminderThreshold = dueTime - (2 * 24 * 60 * 60 * 1000);
+          // 2. Automated Reminders for Confirmed Reviewers within 3 days of deadline
+          else if (!hasSubmitted && inv.status === "accepted") {
+            const reminderThreshold = dueTime - (3 * 24 * 60 * 60 * 1000);
 
             if (now > reminderThreshold) {
               const reminderAlreadySent = auditLogs.some(
@@ -442,16 +453,22 @@ export default function PeerReviewDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900">Peer Review Operations</h1>
           <p className="text-gray-600 mt-2 max-w-3xl leading-relaxed">
-            Assign reviewers, track invitations, and read structured reviews. After authors submit a{" "}
-            <strong>revision</strong>, use <strong>Start post-revision peer-review round</strong> when you
-            are ready for reviewers to evaluate the new file (§2.5); then invite reviewers for that new
-            round. Each round requires <strong>{PEER_REVIEW_TARGET_COUNT}</strong> submitted
-            reviews before you can save a decision (proposal §2.4). <strong>Request additional reviewer</strong>{" "}
-            opens a <em>new round</em> with the same per-round minimum—not an extra slot inside the current
-            round.
+            Assign reviewers, track invitations, and read structured reviews. A <strong>minor revision</strong>{" "}
+            decision sends the manuscript to editorial review; a <strong>major revision</strong> decision
+            returns it to the author, after which you open a new peer-review round once the revised file is
+            uploaded. Each round requires <strong>{PEER_REVIEW_TARGET_COUNT}</strong> submitted reviews
+            before a decision can be saved.
           </p>
         </div>
       </div>
+
+      {!canManage && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <span className="font-semibold">Read-only view.</span> Only the Technical Editor, Editor-in-Chief, and system administrators can send invitations, manage reviewers, and record editorial decisions.
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 lg:col-span-4">
@@ -558,9 +575,9 @@ export default function PeerReviewDashboard() {
                         </p>
                         <button
                           type="button"
-                          disabled={postRevisionRoundSubmitting}
+                          disabled={postRevisionRoundSubmitting || !canManage}
                           onClick={() => void handleStartPostRevisionRound()}
-                          className="px-4 py-2 rounded-md bg-violet-800 text-white text-sm font-medium hover:bg-violet-900 disabled:opacity-60"
+                          className="px-4 py-2 rounded-md bg-violet-800 text-white text-sm font-medium hover:bg-violet-900 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {postRevisionRoundSubmitting ? "Opening…" : "Start post-revision peer-review round"}
                         </button>
@@ -737,7 +754,7 @@ export default function PeerReviewDashboard() {
                             </div>
                             <button
                               type="button"
-                              disabled={!selected}
+                              disabled={!selected || !canManage}
                               onClick={() => void handleInviteSuggested(selected, r)}
                               className="text-xs px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                             >
@@ -752,7 +769,7 @@ export default function PeerReviewDashboard() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={!poolReady || !selected}
+                        disabled={!poolReady || !selected || !canManage}
                         onClick={() => void handleInviteNext(selected)}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[2.5rem]"
                       >
@@ -839,11 +856,12 @@ export default function PeerReviewDashboard() {
                           </div>
                           <button
                             type="button"
+                            disabled={!canManage}
                             onClick={async () => {
                               const ok = await sendReviewReminder(selected, inv.id);
                               if (ok) toast.success("Reminder sent successfully!");
                             }}
-                            className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 shrink-0 cursor-pointer"
+                            className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200 shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Send reminder
                           </button>
@@ -857,54 +875,65 @@ export default function PeerReviewDashboard() {
 
                   <div className="space-y-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
                     <h3 className="font-semibold text-gray-900">Editorial decision</h3>
+                    {!canManage ? (
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                        Only the Technical Editor, Editor-in-Chief, and system administrators can record an editorial decision.
+                      </p>
+                    ) : (
                     <p className="text-xs text-gray-600">
                       One decision is recorded per round for audit. After it is saved, the manuscript status
                       updates and this round&apos;s decision cannot be edited here—use the next workflow stage
                       or a new review round if applicable.
                     </p>
-                    {acceptRejectConflict ? (
+                    )}
+                    {canManage && acceptRejectConflict ? (
                       <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                         Reviewers disagree on <strong>approve</strong> vs <strong>reject</strong>. Review all
                         submitted reports before recording a final decision.
                       </p>
                     ) : null}
-                    <select
-                      value={decision}
-                      onChange={(e) => setDecision(e.target.value as typeof decision)}
-                      disabled={decisionSubmitting}
-                      className="w-full border border-gray-300 rounded px-3 py-2 cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    >
-                      <option value="approved">Approved — proceed to editorial review</option>
-                      <option value="reject">Rejected — send reject notice to author</option>
-                    </select>
-                    <textarea
-                      value={decisionNote}
-                      onChange={(e) => setDecisionNote(e.target.value)}
-                      placeholder="Editorial rationale / consolidated decision note (required)"
-                      rows={4}
-                      disabled={decisionSubmitting}
-                      className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    />
-                    <button
-                      type="button"
-                      disabled={!canDecide || !decisionNote.trim() || decisionSubmitting}
-                      onClick={() => void handleSaveEditorialDecision()}
-                      className="inline-flex items-center justify-center gap-2 min-h-[2.5rem] px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {decisionSubmitting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
-                          Saving…
-                        </>
-                      ) : (
-                        "Save decision"
-                      )}
-                    </button>
-                    {!canDecide && (
-                      <p className="text-xs text-amber-700">
-                        At least {reviewsRequiredForDecision} submitted reviews are required before you can save
-                        a decision.
-                      </p>
+                    {canManage && (
+                      <>
+                        <select
+                          value={decision}
+                          onChange={(e) => setDecision(e.target.value as typeof decision)}
+                          disabled={decisionSubmitting}
+                          className="w-full border border-gray-300 rounded px-3 py-2 cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="minor-revision">Approved w/ Minor Revision — proceed to editorial review</option>
+                          <option value="major-revision">Approved w/ Major Revisions — return to author for full re-review</option>
+                          <option value="reject">Reject — send rejection notice to author</option>
+                        </select>
+                        <textarea
+                          value={decisionNote}
+                          onChange={(e) => setDecisionNote(e.target.value)}
+                          placeholder="Editorial rationale / consolidated decision note (required)"
+                          rows={4}
+                          disabled={decisionSubmitting}
+                          className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          type="button"
+                          disabled={!canDecide || !decisionNote.trim() || decisionSubmitting}
+                          onClick={() => void handleSaveEditorialDecision()}
+                          className="inline-flex items-center justify-center gap-2 min-h-[2.5rem] px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          {decisionSubmitting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden />
+                              Saving…
+                            </>
+                          ) : (
+                            "Save decision"
+                          )}
+                        </button>
+                        {!canDecide && (
+                          <p className="text-xs text-amber-700">
+                            At least {reviewsRequiredForDecision} submitted reviews are required before you can save
+                            a decision.
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </section>

@@ -75,6 +75,7 @@ export const router = createBrowserRouter([
           "reviewer",
           "managing_editor",
           "associate_editor",
+          "technical_editor",
           "editor_in_chief",
           "system_admin",
         ]}
@@ -138,7 +139,7 @@ export const router = createBrowserRouter([
     path: "/peer-review",
     element: (
       <ProtectedRoute
-        allowedRoles={["associate_editor", "managing_editor", "editor_in_chief", "system_admin"]}
+        allowedRoles={["associate_editor", "managing_editor", "technical_editor", "editor_in_chief", "system_admin"]}
       />
     ),
     children: [
@@ -166,7 +167,7 @@ export const router = createBrowserRouter([
     path: "/revision",
     element: (
       <ProtectedRoute
-        allowedRoles={["author", "associate_editor", "managing_editor", "editor_in_chief", "system_admin"]}
+        allowedRoles={["author", "associate_editor", "managing_editor", "technical_editor", "editor_in_chief", "system_admin"]}
       />
     ),
     children: [
@@ -182,7 +183,7 @@ export const router = createBrowserRouter([
     path: "/analytics",
     element: (
       <ProtectedRoute
-        allowedRoles={["associate_editor", "managing_editor", "production_editor", "editor_in_chief", "system_admin"]}
+        allowedRoles={["associate_editor", "managing_editor", "technical_editor", "production_editor", "editor_in_chief", "system_admin"]}
       />
     ),
     children: [
@@ -225,6 +226,7 @@ export const router = createBrowserRouter([
         allowedRoles={[
           "associate_editor",
           "managing_editor",
+          "technical_editor",
           "reviewer",
           "production_editor",
           "editor_in_chief",

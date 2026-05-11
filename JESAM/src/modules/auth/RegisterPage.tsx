@@ -11,6 +11,7 @@ const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "reviewer", label: "Reviewer" },
   { value: "associate_editor", label: "Associate Editor" },
   { value: "managing_editor", label: "Managing Editor" },
+  { value: "technical_editor", label: "Technical Editor" },
   { value: "production_editor", label: "Production Editor" },
   { value: "editor_in_chief", label: "Editor-in-Chief" },
   { value: "system_admin", label: "System Administrator" },
