@@ -4,7 +4,12 @@ import { useAuth, type SignUpData } from "@/contexts/AuthContext";
 import type { AppRole } from "@/modules/publication-impact/types";
 import type { JournalClassification } from "@/types";
 
-const SESAM_FOCUS_OPTIONS: JournalClassification[] = ["Land", "Air", "Water", "People"];
+const SESAM_FOCUS_OPTIONS: JournalClassification[] = [
+  "Land",
+  "Air",
+  "Water",
+  "People",
+];
 
 const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "author", label: "Author" },
@@ -35,7 +40,8 @@ function AuthVisualPanel() {
           JESAM
         </p>
         <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/80">
-          Join the editorial and scholarly community supporting environmental science.
+          Join the editorial and scholarly community supporting environmental
+          science.
         </p>
       </div>
     </div>
@@ -54,7 +60,9 @@ export default function RegisterPage() {
   const [affiliation, setAffiliation] = useState("");
   const [orcidId, setOrcidId] = useState("");
   const [role, setRole] = useState<AppRole>("author");
-  const [reviewExpertise, setReviewExpertise] = useState<JournalClassification | "">("");
+  const [reviewExpertise, setReviewExpertise] = useState<
+    JournalClassification | ""
+  >("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -89,7 +97,8 @@ export default function RegisterPage() {
       affiliation: affiliation || undefined,
       orcid_id: orcidId || undefined,
       role,
-      review_expertise: role === "reviewer" && reviewExpertise ? reviewExpertise : undefined,
+      review_expertise:
+        role === "reviewer" && reviewExpertise ? reviewExpertise : undefined,
     };
 
     const result = await signUp(payload);
@@ -110,15 +119,25 @@ export default function RegisterPage() {
           <div className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
             <div className="w-full max-w-md text-center">
               <img
-                src="/UPLB LOGO w SESAM.png"
+                src="logos/UPLB LOGO w SESAM.png"
                 alt="UPLB School of Environmental Science and Management"
                 width={2281}
                 height={627}
                 className="mx-auto mb-8 h-auto w-full max-w-sm"
               />
               <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-full bg-[#e8f5e9]">
-                <svg className="size-8 text-[#2e7d32]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                <svg
+                  className="size-8 text-[#2e7d32]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               </div>
               <h1 className="font-['Newsreader',serif] text-[30px] leading-tight text-[#1a1c1c]">
@@ -126,7 +145,8 @@ export default function RegisterPage() {
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-[#5f6b67] font-['Public_Sans',sans-serif]">
                 We sent a confirmation link to{" "}
-                <strong className="text-[#1a1c1c]">{email}</strong>. Please verify your email, then sign in.
+                <strong className="text-[#1a1c1c]">{email}</strong>. Please
+                verify your email, then sign in.
               </p>
               <button
                 type="button"
@@ -200,7 +220,10 @@ export default function RegisterPage() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
                 <div>
-                  <label htmlFor="register-middle-name" className={labelClasses}>
+                  <label
+                    htmlFor="register-middle-name"
+                    className={labelClasses}
+                  >
                     Middle Name
                   </label>
                   <input
@@ -298,7 +321,8 @@ export default function RegisterPage() {
                 {role === "reviewer" && (
                   <div>
                     <label className={labelClasses}>
-                      SESAM review expertise <span className="text-[#c62828]">*</span>
+                      SESAM review expertise{" "}
+                      <span className="text-[#c62828]">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {SESAM_FOCUS_OPTIONS.map((opt) => (
