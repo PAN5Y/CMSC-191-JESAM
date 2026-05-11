@@ -3,6 +3,7 @@ import type {
   PublicJournalFocusArea,
   PublicJournalListItem,
 } from "../types";
+import { derivePublicJournalIdentity as derivePublicJournalIdentityFromRow } from "./publicJournalIdentity";
 
 interface PublicJournalListingRow {
   journal_id: string;
@@ -16,15 +17,6 @@ interface PublicJournalListingRow {
   published_at: string | null;
 }
 
-interface DerivedJournalDefinition {
-  id: string;
-  title: string;
-  description: string;
-  institution: string;
-  issn: string | null;
-  accessLabel: string;
-}
-
 function isPublicJournalFocusArea(
   value: unknown
 ): value is PublicJournalFocusArea {
@@ -35,31 +27,6 @@ function normalizePublicJournalFocusArea(
   value: unknown
 ): PublicJournalFocusArea | null {
   return isPublicJournalFocusArea(value) ? value : null;
-}
-
-function getDerivedJournalDefinition(
-  journalId: string,
-  journalTitle?: string | null,
-  journalDescription?: string,
-  institution?: string,
-  issn?: string | null,
-  accessLabel?: string
-) {
-  return {
-    id: journalId,
-    title:
-      journalTitle?.trim() ||
-      "Journal of Environmental Science and Management",
-    description:
-      journalDescription?.trim() ||
-      "Public archive of JESAM-published environmental research with journal-level context for readers before they move into article detail.",
-    institution:
-      institution?.trim() ||
-      "University of the Philippines Los Banos - School of Environmental Science and Management",
-    issn: issn ?? null,
-    accessLabel:
-      accessLabel?.trim() || "Public metadata / downloadable papers vary by article",
-  };
 }
 
 function isValidPublishedDate(value: string | null) {
@@ -123,7 +90,7 @@ function mapRowsToPublicJournals(rows: PublicJournalListingRow[]) {
     const publishedRows = journalRows.filter((row) =>
       isValidPublishedDate(row.published_at)
     );
-    const derivedJournal = getDerivedJournalDefinition(
+    const derivedJournal = derivePublicJournalIdentityFromRow(
       journal.journal_id,
       journal.journal_title,
       journal.journal_description,
@@ -169,8 +136,5 @@ export function derivePublicJournalIdentity(
   _classification: PublicJournalFocusArea | null,
   journalTitle?: string | null
 ) {
-  return getDerivedJournalDefinition(
-    journalId,
-    journalTitle
-  );
+  return derivePublicJournalIdentityFromRow(journalId, journalTitle);
 }

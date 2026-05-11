@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import type {
-  PublicJournalFilters,
-  PublicJournalSearchState,
-} from "../types";
+import type { PublicJournalFilters, PublicJournalSearchState } from "../types";
 import {
   EMPTY_PUBLIC_JOURNAL_FILTERS,
   hasAppliedPublicJournalFilters,
@@ -13,28 +10,73 @@ import {
 } from "../search-state";
 
 const SEARCH_QUERY_PARAM = "q";
-const FILTER_CLASSIFICATION_PARAM = "classification";
-const FILTER_JOURNAL_PARAM = "journal";
-const FILTER_YEAR_PARAM = "year";
+const FILTER_QUERY_PARAMS = {
+  classification: "classification",
+  journalId: "journal",
+  coverageYear: "year",
+} as const;
 
-function getAppliedFilters(searchParams: URLSearchParams): PublicJournalFilters {
+function resolveAppliedFilters(searchParams: URLSearchParams): PublicJournalFilters {
   return normalizePublicJournalFilters({
     classification:
-      (searchParams.get(FILTER_CLASSIFICATION_PARAM) ?? "") as PublicJournalFilters["classification"],
-    journalId: searchParams.get(FILTER_JOURNAL_PARAM) ?? "",
-    coverageYear: searchParams.get(FILTER_YEAR_PARAM) ?? "",
+      (searchParams.get(
+        FILTER_QUERY_PARAMS.classification
+      ) as PublicJournalFilters["classification"] | null) ?? "",
+    journalId: searchParams.get(FILTER_QUERY_PARAMS.journalId) ?? "",
+    coverageYear: searchParams.get(FILTER_QUERY_PARAMS.coverageYear) ?? "",
   });
+}
+
+function applyFiltersToSearchParams(
+  searchParams: URLSearchParams,
+  filters: PublicJournalFilters
+) {
+  const nextSearchParams = new URLSearchParams(searchParams);
+
+  if (filters.classification) {
+    nextSearchParams.set(FILTER_QUERY_PARAMS.classification, filters.classification);
+  } else {
+    nextSearchParams.delete(FILTER_QUERY_PARAMS.classification);
+  }
+
+  if (filters.journalId) {
+    nextSearchParams.set(FILTER_QUERY_PARAMS.journalId, filters.journalId);
+  } else {
+    nextSearchParams.delete(FILTER_QUERY_PARAMS.journalId);
+  }
+
+  if (filters.coverageYear) {
+    nextSearchParams.set(FILTER_QUERY_PARAMS.coverageYear, filters.coverageYear);
+  } else {
+    nextSearchParams.delete(FILTER_QUERY_PARAMS.coverageYear);
+  }
+
+  return nextSearchParams;
 }
 
 export function useJournalSearchState() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const appliedQuery = sanitizeJournalSearchQuery(
+  const resolvedAppliedQuery = sanitizeJournalSearchQuery(
     searchParams.get(SEARCH_QUERY_PARAM) ?? ""
   );
-  const appliedFilters = getAppliedFilters(searchParams);
-  const [draftQuery, setDraftQuery] = useState(appliedQuery);
-  const [draftFilters, setDraftFilters] = useState(appliedFilters);
+  const resolvedAppliedFilters = resolveAppliedFilters(searchParams);
+  const [appliedQuery, setAppliedQuery] = useState(resolvedAppliedQuery);
+  const [appliedFilters, setAppliedFilters] = useState(resolvedAppliedFilters);
+  const [draftQuery, setDraftQuery] = useState(resolvedAppliedQuery);
+  const [draftFilters, setDraftFilters] = useState(resolvedAppliedFilters);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAppliedQuery(resolvedAppliedQuery);
+  }, [resolvedAppliedQuery]);
+
+  useEffect(() => {
+    setAppliedFilters(resolvedAppliedFilters);
+  }, [
+    resolvedAppliedFilters.classification,
+    resolvedAppliedFilters.coverageYear,
+    resolvedAppliedFilters.journalId,
+  ]);
 
   useEffect(() => {
     setDraftQuery(appliedQuery);
@@ -42,21 +84,41 @@ export function useJournalSearchState() {
 
   useEffect(() => {
     setDraftFilters(appliedFilters);
-  }, [appliedFilters]);
+  }, [
+    appliedFilters.classification,
+    appliedFilters.coverageYear,
+    appliedFilters.journalId,
+  ]);
 
-  const submitSearch = () => {
+  const commitDraftSearchState = ({
+    requireQueryWhenNoFilters,
+  }: {
+    requireQueryWhenNoFilters: boolean;
+  }) => {
     const nextQuery = sanitizeJournalSearchQuery(draftQuery);
-    const normalizedFilters = normalizePublicJournalFilters(draftFilters);
-    const hasDraftFilters = hasAppliedPublicJournalFilters(normalizedFilters);
+    const normalizedDraftFilters = normalizePublicJournalFilters(draftFilters);
+    const hasDraftFilters = hasAppliedPublicJournalFilters(normalizedDraftFilters);
+    const hadAppliedQuery = appliedQuery.length > 0;
+    const hadAppliedFilters = hasAppliedPublicJournalFilters(appliedFilters);
+    const nextSearchParams = new URLSearchParams(searchParams);
 
-    if (!nextQuery && !hasDraftFilters) {
+    if (!nextQuery && requireQueryWhenNoFilters && !hasDraftFilters) {
+      const nextSearchParamsWithClearedFilters = applyFiltersToSearchParams(
+        nextSearchParams,
+        EMPTY_PUBLIC_JOURNAL_FILTERS
+      );
+
+      nextSearchParamsWithClearedFilters.delete(SEARCH_QUERY_PARAM);
+      setAppliedQuery("");
+      setAppliedFilters(EMPTY_PUBLIC_JOURNAL_FILTERS);
+      setSearchParams(nextSearchParamsWithClearedFilters);
       setValidationMessage(
-        "Enter a topic, journal theme, keyword, or choose filters to begin."
+        hadAppliedQuery || hadAppliedFilters
+          ? null
+          : "Enter a topic, author, journal title, issue detail, or year to begin."
       );
       return;
     }
-
-    const nextSearchParams = new URLSearchParams(searchParams);
 
     if (nextQuery) {
       nextSearchParams.set(SEARCH_QUERY_PARAM, nextQuery);
@@ -64,36 +126,53 @@ export function useJournalSearchState() {
       nextSearchParams.delete(SEARCH_QUERY_PARAM);
     }
 
-    if (normalizedFilters.classification) {
-      nextSearchParams.set(
-        FILTER_CLASSIFICATION_PARAM,
-        normalizedFilters.classification
-      );
-    } else {
-      nextSearchParams.delete(FILTER_CLASSIFICATION_PARAM);
-    }
+    const nextSearchParamsWithFilters = applyFiltersToSearchParams(
+      nextSearchParams,
+      normalizedDraftFilters
+    );
 
-    if (normalizedFilters.journalId) {
-      nextSearchParams.set(FILTER_JOURNAL_PARAM, normalizedFilters.journalId);
-    } else {
-      nextSearchParams.delete(FILTER_JOURNAL_PARAM);
-    }
-
-    if (normalizedFilters.coverageYear) {
-      nextSearchParams.set(FILTER_YEAR_PARAM, normalizedFilters.coverageYear);
-    } else {
-      nextSearchParams.delete(FILTER_YEAR_PARAM);
-    }
-
-    setSearchParams(nextSearchParams);
+    setAppliedQuery(nextQuery);
+    setAppliedFilters(normalizedDraftFilters);
+    setSearchParams(nextSearchParamsWithFilters);
     setValidationMessage(null);
+  };
+
+  const submitSearch = () => {
+    commitDraftSearchState({ requireQueryWhenNoFilters: true });
   };
 
   const clearSearch = () => {
     const nextSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.delete(SEARCH_QUERY_PARAM);
+    setAppliedQuery("");
     setSearchParams(nextSearchParams);
     setDraftQuery("");
+    setValidationMessage(null);
+  };
+
+  const updateDraftFilter = <K extends keyof PublicJournalFilters>(
+    key: K,
+    value: PublicJournalFilters[K]
+  ) => {
+    setDraftFilters((currentFilters) => ({
+      ...currentFilters,
+      [key]: value,
+    }));
+  };
+
+  const applyFilters = () => {
+    commitDraftSearchState({ requireQueryWhenNoFilters: false });
+  };
+
+  const clearFilters = () => {
+    const nextSearchParams = applyFiltersToSearchParams(
+      searchParams,
+      EMPTY_PUBLIC_JOURNAL_FILTERS
+    );
+
+    setAppliedFilters(EMPTY_PUBLIC_JOURNAL_FILTERS);
+    setSearchParams(nextSearchParams);
+    setDraftFilters(EMPTY_PUBLIC_JOURNAL_FILTERS);
     setValidationMessage(null);
   };
 
@@ -103,27 +182,6 @@ export function useJournalSearchState() {
     if (validationMessage) {
       setValidationMessage(null);
     }
-  };
-
-  const updateDraftFilter = <K extends keyof PublicJournalFilters>(
-    key: K,
-    value: PublicJournalFilters[K]
-  ) => {
-    setDraftFilters((currentFilters) =>
-      normalizePublicJournalFilters({
-        ...currentFilters,
-        [key]: value,
-      })
-    );
-  };
-
-  const clearFilters = () => {
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.delete(FILTER_CLASSIFICATION_PARAM);
-    nextSearchParams.delete(FILTER_JOURNAL_PARAM);
-    nextSearchParams.delete(FILTER_YEAR_PARAM);
-    setSearchParams(nextSearchParams);
-    setDraftFilters(EMPTY_PUBLIC_JOURNAL_FILTERS);
   };
 
   return {
@@ -139,6 +197,7 @@ export function useJournalSearchState() {
     updateDraftFilter,
     submitSearch,
     clearSearch,
+    applyFilters,
     clearFilters,
   } satisfies PublicJournalSearchState & {
     updateDraftQuery: (value: string) => void;
@@ -148,6 +207,7 @@ export function useJournalSearchState() {
     ) => void;
     submitSearch: () => void;
     clearSearch: () => void;
+    applyFilters: () => void;
     clearFilters: () => void;
   };
 }

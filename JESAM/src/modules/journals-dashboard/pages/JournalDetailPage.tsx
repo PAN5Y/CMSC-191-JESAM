@@ -1,9 +1,7 @@
 import {
-  AlertCircle,
   ArrowLeft,
   BookOpenText,
-  Compass,
-  Leaf,
+  Search,
   Sparkles,
 } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router";
@@ -16,8 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import ArticlePreviewCard from "../components/ArticlePreviewCard";
+import PublicJournalsShell from "../components/PublicJournalsShell";
+import { PublicRecoveryState } from "../components/PublicRecoveryState";
+import { useJournalArticlePreviewSearch } from "../hooks/useJournalArticlePreviewSearch";
 import { usePublicJournalDetail } from "../hooks/usePublicJournalDetail";
+import { getPublicRecoveryCopy } from "../queries/publicRecoveryState";
 import type { PublicJournalDetailRouteState } from "../types";
 
 function formatPublishedDate(date: string | null) {
@@ -60,34 +64,20 @@ export default function JournalDetailPage() {
     to: routeState?.returnTo ?? "/journals",
     label: routeState?.returnLabel ?? "Back to Journals",
   };
+  const recoveryCopy = getPublicRecoveryCopy("journal-detail");
+  const previewSearch = useJournalArticlePreviewSearch(
+    journalDetail?.articlePreviews ?? [],
+    {
+      resetKey: journalId,
+      initialQuery: routeState?.localSearchQuery ?? "",
+    }
+  );
+  const journalReturnTo = journalId ? `/journals/${journalId}` : "/journals";
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#edf1fb_0%,#f5efe5_22%,#f7f8fc_56%,#fcfcfd_100%)] text-slate-900">
-      <header className="border-b border-slate-200/80 bg-white/72 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-4">
-            <div className="flex size-14 items-center justify-center rounded-2xl border border-[#d8deef] bg-[linear-gradient(135deg,#24315f,#51639a)] text-white shadow-[0_12px_28px_rgba(36,49,95,0.18)]">
-              <Leaf className="size-6" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-['Newsreader',serif] text-2xl tracking-tight text-[#24315f]">
-                JESAM Journals
-              </p>
-              <p className="font-['Public_Sans',sans-serif] text-sm text-slate-600">
-                Journal details and published paper browsing
-              </p>
-            </div>
-          </div>
-          <Button asChild variant="outline">
-            <Link to={returnTarget.to}>
-              <ArrowLeft />
-              {returnTarget.label}
-            </Link>
-          </Button>
-        </div>
-      </header>
-
-      <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10 lg:px-8 lg:py-14">
+    <PublicJournalsShell
+      backgroundClassName="bg-[linear-gradient(180deg,#edf1fb_0%,#f5efe5_22%,#f7f8fc_56%,#fcfcfd_100%)]"
+    >
         {loading ? (
           <Card className="border-[#d8deef] bg-white/85 shadow-[0_18px_50px_rgba(36,49,95,0.08)]">
             <CardContent className="flex flex-col gap-4 px-6 py-8">
@@ -107,35 +97,14 @@ export default function JournalDetailPage() {
         ) : null}
 
         {!loading && error ? (
-          <Card className="border-[#efd1d1] bg-[linear-gradient(180deg,#ffffff,#fff7f6)] shadow-sm">
-            <CardContent className="flex flex-col gap-5 px-6 py-8 md:flex-row md:items-center md:justify-between">
-              <div className="flex max-w-2xl gap-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#fff2f2] text-[#b13d3d]">
-                  <AlertCircle className="size-5" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="font-['Newsreader',serif] text-2xl text-[#7f2525]">
-                    Journal detail could not be loaded
-                  </h2>
-                  <p className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                    The journal page is temporarily unavailable. You can retry
-                    the request or return to the public journal listing.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={retry}
-                  className="bg-[#24315f] text-white hover:bg-[#1e294f]"
-                >
-                  Retry Detail
-                </Button>
-                <Button asChild variant="outline">
-                  <Link to={returnTarget.to}>{returnTarget.label}</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <PublicRecoveryState
+            title={recoveryCopy.title}
+            description={recoveryCopy.description}
+            primaryActionLabel={recoveryCopy.primaryActionLabel}
+            onPrimaryAction={retry}
+            secondaryActionLabel={returnTarget.label}
+            secondaryActionTo={returnTarget.to}
+          />
         ) : null}
 
         {!loading && !error && notFound ? (
@@ -148,7 +117,10 @@ export default function JournalDetailPage() {
                 The requested journal is not available in the current public
                 listing. You can continue browsing from the journals list.
               </p>
-              <Button asChild className="bg-[#24315f] text-white hover:bg-[#1e294f]">
+              <Button
+                asChild
+                className="bg-[#24315f] text-white hover:bg-[#1e294f]"
+              >
                 <Link to={returnTarget.to}>{returnTarget.label}</Link>
               </Button>
             </CardContent>
@@ -157,6 +129,19 @@ export default function JournalDetailPage() {
 
         {!loading && !error && journalDetail ? (
           <>
+            <div className="flex items-start">
+              <Button
+                asChild
+                variant="outline"
+                className="border-[#d8deef] bg-white/90 text-[#24315f] hover:bg-[#f5f8ff]"
+              >
+                <Link to={returnTarget.to}>
+                  <ArrowLeft />
+                  {returnTarget.label}
+                </Link>
+              </Button>
+            </div>
+
             <section className="relative overflow-hidden rounded-[2rem] border border-[#d9deec] bg-[linear-gradient(135deg,#1f2a52_0%,#304178_42%,#d7c4a3_140%)] px-7 py-8 text-white shadow-[0_24px_80px_rgba(36,49,95,0.16)] lg:grid lg:grid-cols-[1.25fr_0.75fr] lg:gap-8 lg:px-10 lg:py-10">
               <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_58%)]" />
               <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
@@ -276,20 +261,125 @@ export default function JournalDetailPage() {
                 </Badge>
               </div>
 
-              {journalDetail.articlePreviews.length > 0 ? (
+              <Card className="overflow-hidden border-[#d8deef] bg-[linear-gradient(180deg,#ffffff_0%,#fbfbfe_46%,#f5f7ff_100%)] shadow-[0_22px_55px_rgba(36,49,95,0.1)]">
+                <CardHeader className="space-y-3 border-b border-[#e3e7f3] bg-[linear-gradient(135deg,#f8f9ff_0%,#fbf5e8_100%)]">
+                  <CardTitle className="font-['Newsreader',serif] text-2xl text-[#24315f]">
+                    Search within this journal
+                  </CardTitle>
+                  <CardDescription className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
+                    Narrow this journal's published previews by title, author,
+                    abstract text, topic, year, or issue label.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 p-6">
+                  <form
+                    className="space-y-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      previewSearch.submitSearch();
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="journal-article-preview-search"
+                        className="font-['Public_Sans',sans-serif] text-sm text-[#24315f]"
+                      >
+                        Search within this journal
+                      </Label>
+                      <div className="flex flex-col gap-3 md:flex-row">
+                        <div className="relative flex-1">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            id="journal-article-preview-search"
+                            value={previewSearch.draftQuery}
+                            onChange={(event) =>
+                              previewSearch.updateDraftQuery(event.target.value)
+                            }
+                            placeholder="Try author names, topic words, year, or issue label"
+                            className="h-12 border-[#cfd8ef] bg-white pl-9 font-['Public_Sans',sans-serif] text-sm text-slate-700 shadow-sm"
+                          />
+                        </div>
+                        <div className="flex gap-3 md:shrink-0">
+                          <Button
+                            type="submit"
+                            className="h-12 bg-[#24315f] px-5 text-white hover:bg-[#1e294f]"
+                          >
+                            Apply Search
+                          </Button>
+                          {previewSearch.hasAppliedQuery ||
+                          previewSearch.draftQuery.trim() ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={previewSearch.clearSearch}
+                              className="h-12 border-[#d4c7ad] bg-[#fffaf0] text-[#5f4d31]"
+                            >
+                              Clear Search
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+
+                  {previewSearch.validationMessage ? (
+                    <div className="rounded-2xl border border-[#e8d3a1] bg-[#fffaf0] px-4 py-3">
+                      <p className="font-['Public_Sans',sans-serif] text-sm text-[#7a4b11]">
+                        {previewSearch.validationMessage}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {previewSearch.hasAppliedQuery ? (
+                    <div className="rounded-2xl border border-[#dccfb8] bg-[linear-gradient(135deg,#fffaf0,#f5ecda)] px-4 py-3">
+                      <p className="font-['Public_Sans',sans-serif] text-sm text-[#24315f]">
+                        Current search:{" "}
+                        <span className="font-semibold">
+                          "{previewSearch.appliedQuery}"
+                        </span>
+                      </p>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+
+              {previewSearch.matchingPreviews.length > 0 ? (
                 <div className="grid gap-5">
-                  {journalDetail.articlePreviews.map((article) => (
+                  {previewSearch.matchingPreviews.map((article) => (
                     <ArticlePreviewCard
                       key={article.id}
                       article={article}
                       journalId={journalDetail.id}
                       journalTitle={journalDetail.title}
-                      returnTo={returnTarget.to}
-                      returnLabel={returnTarget.label}
+                      returnTo={journalReturnTo}
+                      returnLabel="Back to Journal Detail"
+                      journalReturnTo={returnTarget.to}
+                      journalReturnLabel={returnTarget.label}
+                      journalSearchQuery={previewSearch.appliedQuery}
                     />
                   ))}
                 </div>
-              ) : (
+              ) : previewSearch.hasAppliedQuery ? (
+                <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#fbf6ec)] shadow-sm">
+                  <CardContent className="space-y-3 px-6 py-8">
+                    <h3 className="font-['Newsreader',serif] text-xl text-[#24315f] sm:text-2xl">
+                      No paper previews match this journal search
+                    </h3>
+                    <p className="max-w-2xl font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
+                      Try a broader topic, author name, year, or issue label, or
+                      clear the journal-local search to return to the full preview
+                      list.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={previewSearch.clearSearch}
+                      className="border-[#cfd8ef] text-[#24315f]"
+                    >
+                      Clear Search
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : journalDetail.articlePreviews.length === 0 ? (
                 <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#fbf6ec)] shadow-sm">
                   <CardContent className="space-y-3 px-6 py-8">
                     <h3 className="font-['Newsreader',serif] text-xl text-[#24315f] sm:text-2xl">
@@ -301,47 +391,11 @@ export default function JournalDetailPage() {
                     </p>
                   </CardContent>
                 </Card>
-              )}
+              ) : null}
             </section>
 
-            <section className="grid gap-5 lg:grid-cols-2">
-              <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#eef3ff)] shadow-[0_18px_40px_rgba(36,49,95,0.08)]">
-                <CardHeader className="gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-white text-[#24315f] shadow-sm">
-                    <Compass className="size-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <CardTitle className="font-['Newsreader',serif] text-xl text-[#24315f] sm:text-2xl">
-                      Keep Orientation
-                    </CardTitle>
-                    <CardDescription className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                      Return to the journals listing at any point without
-                      entering the internal editorial flow.
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-[#ddd3c1] bg-[linear-gradient(180deg,#fffdf9,#f4ecdd)] shadow-[0_18px_40px_rgba(175,145,94,0.08)]">
-                <CardHeader className="gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-white text-[#24315f] shadow-sm">
-                    <BookOpenText className="size-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <CardTitle className="font-['Newsreader',serif] text-xl text-[#24315f] sm:text-2xl">
-                      Paper Details Are Available
-                    </CardTitle>
-                    <CardDescription className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                      Open a published paper to review the abstract and details.
-                      Download decisions remain in later work.
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-              </Card>
-            </section>
           </>
         ) : null}
-      </main>
-    </div>
+    </PublicJournalsShell>
   );
 }

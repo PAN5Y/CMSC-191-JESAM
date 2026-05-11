@@ -6,11 +6,7 @@ import type {
 } from "./types";
 
 export const PUBLIC_JOURNAL_SEARCHABLE_FIELDS: PublicJournalSearchableField[] = [
-  "article-title",
-  "authors",
-  "abstract-excerpt",
   "journal-title",
-  "journal-context",
   "journal-description",
   "institution",
   "classification",

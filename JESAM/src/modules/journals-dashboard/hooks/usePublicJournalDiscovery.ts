@@ -1,40 +1,47 @@
 import { usePublicJournals } from "./usePublicJournals";
 import { usePublicArticleSearchResults } from "./usePublicArticleSearchResults";
 import { useJournalSearchState } from "./useJournalSearchState";
-import { filterPublicJournals } from "../search-state";
+import {
+  filterPublicJournals,
+} from "../search-state";
 
 export function usePublicJournalDiscovery() {
   const publicJournals = usePublicJournals();
   const search = useJournalSearchState();
-  const articleSearch = usePublicArticleSearchResults(
-    search.appliedQuery,
-    search.hasAppliedQuery,
-    search.appliedFilters
-  );
-  const filteredJournals = filterPublicJournals(
+  const isResultsMode = search.hasAppliedQuery || search.hasAppliedFilters;
+  const matchingJournals = filterPublicJournals(
     publicJournals.journals,
-    search.hasAppliedQuery ? search.appliedQuery : "",
+    isResultsMode ? search.appliedQuery : "",
     search.appliedFilters
   );
-  const matchingJournals = search.hasAppliedQuery
-    ? filteredJournals
-    : [];
+  const articleResults = usePublicArticleSearchResults(
+    search.appliedQuery,
+    isResultsMode,
+    search.appliedFilters
+  );
+  const supportingJournalMatchesLoading =
+    isResultsMode && publicJournals.loading;
+  const supportingJournalMatchesError =
+    isResultsMode ? publicJournals.error : null;
+  const isBrowseMode = !isResultsMode;
 
   return {
     ...search,
     allJournals: publicJournals.journals,
-    journals: search.hasAppliedFilters ? filteredJournals : publicJournals.journals,
-    journalListingLoading: publicJournals.loading,
-    journalListingError: publicJournals.error,
+    browseJournals: publicJournals.journals,
+    matchingJournals: isResultsMode ? matchingJournals : [],
+    journalListingLoading: isBrowseMode && publicJournals.loading,
+    journalListingError: isBrowseMode ? publicJournals.error : null,
     retryJournalListing: publicJournals.retry,
-    articleResults: articleSearch.results,
-    articleResultsLoading: articleSearch.loading,
-    articleResultsError: articleSearch.error,
-    retryArticleResults: articleSearch.retry,
-    matchingJournals,
-    totalJournals: filteredJournals.length,
-    isBrowseMode: !search.hasAppliedQuery,
-    hasSearchResults:
-      articleSearch.results.length > 0 || matchingJournals.length > 0,
+    articleResults: articleResults.results,
+    articleResultsLoading: isResultsMode && articleResults.loading,
+    articleResultsError: isResultsMode ? articleResults.error : null,
+    retryArticleResults: articleResults.retry,
+    totalJournals: publicJournals.journals.length,
+    isBrowseMode,
+    hasArticleResults: articleResults.results.length > 0,
+    hasSupportingJournalMatches: isResultsMode && matchingJournals.length > 0,
+    supportingJournalMatchesLoading,
+    supportingJournalMatchesError,
   };
 }

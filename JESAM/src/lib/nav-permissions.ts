@@ -29,7 +29,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
     return [
       { icon: Upload, label: "Submission", to: "/author" },
       { icon: Edit, label: "Revision", to: "/revision" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
   }
@@ -37,7 +37,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
   if (role === "reviewer") {
     return [
       { icon: Users, label: "Peer Review", to: "/peer-review/reviewer" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
   }
@@ -47,7 +47,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
       { icon: Upload, label: "Submission", to: "/submission/queue" },
       { icon: Users, label: "Peer Review", to: "/peer-review" },
       { icon: Edit, label: "Revision", to: "/revision" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
@@ -58,7 +58,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
       { icon: Upload, label: "Submission", to: "/submission/screening" },
       { icon: Users, label: "Peer Review", to: "/peer-review" },
       { icon: Edit, label: "Revision", to: "/revision" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
@@ -67,7 +67,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
   if (role === "production_editor") {
     return [
       { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
@@ -79,7 +79,7 @@ export function getSidebarItems(role: AppRole | null | undefined): SidebarNavIte
     { icon: Users, label: "Peer Review", to: "/peer-review" },
     { icon: Edit, label: "Revision", to: "/revision" },
     { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
-    { icon: BookOpen, label: "Browse journals", to: "/browse" },
+    { icon: BookOpen, label: "Browse journals", to: "/journals" },
     { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
     { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
   ];

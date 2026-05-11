@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import AppLayout from "./components/layout/AppLayout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import LoginPage from "./modules/auth/LoginPage";
@@ -33,6 +33,21 @@ function InternalHomeRedirect() {
   return <Navigate to={getWorkspaceHomePath(role)} replace />;
 }
 
+function LegacyJournalsAliasRedirect() {
+  const location = useLocation();
+
+  return (
+    <Navigate
+      to={{
+        pathname: "/journals",
+        search: location.search,
+        hash: location.hash,
+      }}
+      replace
+    />
+  );
+}
+
 export const router = createBrowserRouter([
   // ── Public routes (no auth required) ──
   { path: "/login", element: <LoginPage /> },
@@ -42,9 +57,8 @@ export const router = createBrowserRouter([
   { path: "/journals/:journalId", element: <JournalDetailPage /> },
   { path: "/journals/articles/:articleId", element: <ArticleDetailPage /> },
   { path: "/article/public/:id", element: <PublicArticlePage /> },
-  { path: "/browse", element: <JournalsDashboard /> },
-  { path: "/journals/public", element: <Navigate to="/browse" replace /> },
-  { path: "/journals", element: <Navigate to="/browse" replace /> },
+  { path: "/browse", element: <LegacyJournalsAliasRedirect /> },
+  { path: "/journals/public", element: <LegacyJournalsAliasRedirect /> },
 
   // ── Author-only routes ──
   {

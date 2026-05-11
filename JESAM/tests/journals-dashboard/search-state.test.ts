@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   EMPTY_PUBLIC_JOURNAL_FILTERS,
+  PUBLIC_JOURNAL_SEARCHABLE_FIELDS,
   buildPublicJournalSearchDocument,
   filterPublicJournals,
   hasAppliedPublicJournalFilters,
@@ -50,6 +51,19 @@ test("buildPublicJournalSearchDocument includes current public-safe metadata", (
   assert.match(document, /coastal monitoring/);
   assert.match(document, /2026/);
   assert.match(document, /vol\. 32 no\. 1/);
+});
+
+test("PUBLIC_JOURNAL_SEARCHABLE_FIELDS stays scoped to journal-level public metadata in Story 2.1", () => {
+  assert.deepEqual(PUBLIC_JOURNAL_SEARCHABLE_FIELDS, [
+    "journal-title",
+    "journal-description",
+    "institution",
+    "classification",
+    "access-label",
+    "issn",
+    "issue-label",
+    "coverage-year",
+  ]);
 });
 
 test("matchesPublicJournalSearchQuery requires every query token to be present", () => {

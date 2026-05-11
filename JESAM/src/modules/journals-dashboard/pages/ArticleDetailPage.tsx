@@ -1,13 +1,9 @@
 import {
-  AlertCircle,
   ArrowLeft,
-  BookMarked,
+  Bot,
   FileText,
-  Leaf,
-  Layers3,
   Sparkles,
   Tag,
-  Users,
 } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +15,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DownloadAvailabilityState } from "../components/DownloadAvailabilityState";
+import { ArticleAssistantPanel } from "../components/ArticleAssistantPanel";
+import PublicJournalsShell from "../components/PublicJournalsShell";
+import { PublicRecoveryState } from "../components/PublicRecoveryState";
+import { SummaryPanel } from "../components/SummaryPanel";
 import { usePublicArticleDetail } from "../hooks/usePublicArticleDetail";
+import { getPublicRecoveryCopy } from "../queries/publicRecoveryState";
 import type { PublicArticleDetailRouteState } from "../types";
 
 function formatPublishedDate(date: string | null) {
@@ -45,9 +47,21 @@ function getReturnTarget(
   fallbackJournalId?: string
 ) {
   if (state?.returnTo) {
+    const journalDetailState =
+      state.journalDetailReturnTo ||
+      state.journalDetailReturnLabel ||
+      state.journalLocalSearchQuery
+        ? {
+            returnTo: state.journalDetailReturnTo,
+            returnLabel: state.journalDetailReturnLabel,
+            localSearchQuery: state.journalLocalSearchQuery,
+          }
+        : undefined;
+
     return {
       to: state.returnTo,
       label: state.returnLabel ?? "Back to Search Results",
+      state: journalDetailState,
     };
   }
 
@@ -73,34 +87,12 @@ export default function ArticleDetailPage() {
   const { articleDetail, loading, error, notFound, retry } =
     usePublicArticleDetail(articleId);
   const returnTarget = getReturnTarget(routeState, articleDetail?.journalId);
+  const recoveryCopy = getPublicRecoveryCopy("article-detail");
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#eef1fb_0%,#f5efe5_24%,#f7f8fc_56%,#fcfcfd_100%)] text-slate-900">
-      <header className="border-b border-slate-200/80 bg-white/72 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-4">
-            <div className="flex size-14 items-center justify-center rounded-2xl border border-[#d8deef] bg-[linear-gradient(135deg,#24315f,#51639a)] text-white shadow-[0_12px_28px_rgba(36,49,95,0.18)]">
-              <Leaf className="size-6" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-['Newsreader',serif] text-2xl tracking-tight text-[#24315f]">
-                JESAM Journals
-              </p>
-              <p className="font-['Public_Sans',sans-serif] text-sm text-slate-600">
-                Public paper details
-              </p>
-            </div>
-          </div>
-          <Button asChild variant="outline">
-            <Link to={returnTarget.to}>
-              <ArrowLeft />
-              {returnTarget.label}
-            </Link>
-          </Button>
-        </div>
-      </header>
-
-      <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10 lg:px-8 lg:py-14">
+    <PublicJournalsShell
+      backgroundClassName="bg-[linear-gradient(180deg,#eef1fb_0%,#f5efe5_24%,#f7f8fc_56%,#fcfcfd_100%)]"
+    >
         {loading ? (
           <Card className="border-[#d8deef] bg-white/85 shadow-[0_18px_50px_rgba(36,49,95,0.08)]">
             <CardContent className="flex flex-col gap-4 px-6 py-8">
@@ -120,35 +112,14 @@ export default function ArticleDetailPage() {
         ) : null}
 
         {!loading && error ? (
-          <Card className="border-[#efd1d1] bg-[linear-gradient(180deg,#ffffff,#fff7f6)] shadow-sm">
-            <CardContent className="flex flex-col gap-5 px-6 py-8 md:flex-row md:items-center md:justify-between">
-              <div className="flex max-w-2xl gap-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#fff2f2] text-[#b13d3d]">
-                  <AlertCircle className="size-5" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="font-['Newsreader',serif] text-2xl text-[#7f2525]">
-                    Paper details could not be loaded
-                  </h2>
-                  <p className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                    The paper page is temporarily unavailable. You can retry
-                    the request or return to the public browse flow.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  onClick={retry}
-                  className="bg-[#24315f] text-white hover:bg-[#1e294f]"
-                >
-                  Retry Detail
-                </Button>
-                <Button asChild variant="outline">
-                  <Link to={returnTarget.to}>{returnTarget.label}</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <PublicRecoveryState
+            title={recoveryCopy.title}
+            description={recoveryCopy.description}
+            primaryActionLabel={recoveryCopy.primaryActionLabel}
+            onPrimaryAction={retry}
+            secondaryActionLabel={returnTarget.label}
+            secondaryActionTo={returnTarget.to}
+          />
         ) : null}
 
         {!loading && !error && notFound ? (
@@ -167,7 +138,9 @@ export default function ArticleDetailPage() {
                   asChild
                   className="bg-[#24315f] text-white hover:bg-[#1e294f]"
                 >
-                  <Link to={returnTarget.to}>{returnTarget.label}</Link>
+                  <Link to={returnTarget.to} state={returnTarget.state}>
+                    {returnTarget.label}
+                  </Link>
                 </Button>
                 <Button asChild variant="outline">
                   <Link to="/journals">Browse Journals</Link>
@@ -179,6 +152,19 @@ export default function ArticleDetailPage() {
 
         {!loading && !error && articleDetail ? (
           <>
+            <div className="flex items-start">
+              <Button
+                asChild
+                variant="outline"
+                className="border-[#d8deef] bg-white/90 text-[#24315f] hover:bg-[#f5f8ff]"
+              >
+                <Link to={returnTarget.to} state={returnTarget.state}>
+                  <ArrowLeft />
+                  {returnTarget.label}
+                </Link>
+              </Button>
+            </div>
+
             <section className="relative overflow-hidden rounded-[2rem] border border-[#d9deec] bg-[linear-gradient(135deg,#1f2a52_0%,#304178_42%,#d7c4a3_140%)] px-7 py-8 text-white shadow-[0_24px_80px_rgba(36,49,95,0.16)] lg:grid lg:grid-cols-[1.3fr_0.7fr] lg:gap-8 lg:px-10 lg:py-10">
               <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_58%)]" />
               <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
@@ -272,25 +258,25 @@ export default function ArticleDetailPage() {
             </section>
 
             <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-              <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#f7f9ff)] shadow-[0_18px_44px_rgba(36,49,95,0.08)]">
-                <CardHeader className="gap-3">
-                  <div className="flex items-center gap-2 text-[#6a5a3d]">
-                    <FileText className="size-4" />
-                    <p className="text-sm font-medium uppercase tracking-[0.18em]">
+              <div className="space-y-6">
+                <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#f7f9ff)] shadow-[0_18px_44px_rgba(36,49,95,0.08)]">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="font-['Newsreader',serif] text-3xl text-[#1d2548]">
                       Abstract
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="font-['Public_Sans',sans-serif] text-sm leading-7 text-slate-700 sm:text-base">
+                      {articleDetail.abstract ??
+                        "An abstract is not available for this public article record yet."}
                     </p>
-                  </div>
-                  <CardTitle className="font-['Newsreader',serif] text-3xl text-[#1d2548]">
-                    Evaluate relevance before file access
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="font-['Public_Sans',sans-serif] text-sm leading-7 text-slate-700 sm:text-base">
-                    {articleDetail.abstract ??
-                      "An abstract is not available for this public article record yet."}
-                  </p>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+
+                {articleDetail.summary ? (
+                  <SummaryPanel summary={articleDetail.summary} />
+                ) : null}
+              </div>
 
               <div className="space-y-6">
                 <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#eef3ff)] shadow-[0_18px_44px_rgba(36,49,95,0.08)]">
@@ -326,67 +312,18 @@ export default function ArticleDetailPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-[#ddd3c1] bg-[linear-gradient(180deg,#fffdf9,#f4ecdd)] shadow-[0_18px_44px_rgba(175,145,94,0.08)]">
-                  <CardHeader className="gap-3">
-                    <div className="flex items-center gap-2 text-[#6a5a3d]">
-                      <BookMarked className="size-4" />
-                      <p className="text-sm font-medium uppercase tracking-[0.18em]">
-                        Next Step
-                      </p>
-                    </div>
-                    <CardTitle className="font-['Newsreader',serif] text-2xl text-[#24315f]">
-                      Download flow comes next
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                      This page focuses on paper details only. Download
-                      availability and file access actions are added in Epic 3.
-                    </p>
-                  </CardContent>
-                </Card>
+                <DownloadAvailabilityState
+                  status={articleDetail.downloadAvailabilityStatus}
+                  isDownloadable={articleDetail.isDownloadable}
+                  downloadUrl={articleDetail.downloadUrl}
+                />
+
+                <ArticleAssistantPanel article={articleDetail} />
               </div>
             </section>
 
-            <section className="grid gap-5 lg:grid-cols-2">
-              <Card className="border-[#dce3f3] bg-[linear-gradient(180deg,#ffffff,#eef3ff)] shadow-[0_18px_40px_rgba(36,49,95,0.08)]">
-                <CardHeader className="gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-white text-[#24315f] shadow-sm">
-                    <Users className="size-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <CardTitle className="font-['Newsreader',serif] text-2xl text-[#24315f]">
-                      Stay Oriented
-                    </CardTitle>
-                    <CardDescription className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                      Return to the parent journal detail page or the broader
-                      public journals listing without entering any protected
-                      workflow.
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="border-[#ddd3c1] bg-[linear-gradient(180deg,#fffdf9,#f4ecdd)] shadow-[0_18px_40px_rgba(175,145,94,0.08)]">
-                <CardHeader className="gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-white text-[#24315f] shadow-sm">
-                    <Layers3 className="size-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <CardTitle className="font-['Newsreader',serif] text-2xl text-[#24315f]">
-                      Paper Details
-                    </CardTitle>
-                    <CardDescription className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
-                      This page focuses on one paper, while the journal page
-                      helps you browse the wider collection.
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-              </Card>
-            </section>
           </>
         ) : null}
-      </main>
-    </div>
+    </PublicJournalsShell>
   );
 }

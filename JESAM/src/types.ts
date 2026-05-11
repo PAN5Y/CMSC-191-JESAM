@@ -202,6 +202,7 @@ export interface Manuscript {
   title: string;
   authors: string[];
   abstract: string;
+  public_summary?: string | null;
   keywords: string[];
   status: ManuscriptStatus;
   classification: JournalClassification | null;
@@ -283,6 +284,15 @@ export function parseSubmissionMetadata(value: unknown): SubmissionMetadata | nu
   return null;
 }
 
+export function parseOptionalText(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 const CLASSIFICATIONS: JournalClassification[] = ["Land", "Air", "Water", "People"];
 
 export function parseClassification(value: unknown): JournalClassification | null {
@@ -308,6 +318,7 @@ export function normalizeManuscriptRow(row: Record<string, unknown>): Manuscript
     submitter_id: (row.submitter_id as string) ?? null,
     title: String(row.title ?? ""),
     abstract: String(row.abstract ?? ""),
+    public_summary: parseOptionalText(row.public_summary ?? row.summary),
     authors: parseAuthors(row.authors),
     keywords: parseKeywords(row.keywords),
     status: row.status as ManuscriptStatus,

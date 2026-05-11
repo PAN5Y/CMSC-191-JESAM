@@ -36,7 +36,16 @@ export default function JournalMatchCard({
         </div>
         <div className="space-y-2">
           <CardTitle className="font-['Newsreader',serif] text-2xl leading-tight text-[#1d2548]">
-            {journal.title}
+            <Link
+              to={`/journals/${journal.id}`}
+              state={{
+                returnTo,
+                returnLabel: "Back to Search Results",
+              }}
+              className="transition hover:text-[#24315f]"
+            >
+              {journal.title}
+            </Link>
           </CardTitle>
           <CardDescription className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
             {journal.description}
@@ -48,29 +57,29 @@ export default function JournalMatchCard({
           <div className="flex items-start gap-3">
             <BookOpenText className="mt-0.5 size-4 text-[#24315f]" />
             <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                  Topics
-                </p>
-                <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
-                  {journal.focusAreas.length > 0
-                    ? journal.focusAreas.join(", ")
-                    : "Topics coming soon"}
-                </p>
-              </div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                Topics
+              </p>
+              <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
+                {journal.focusAreas.length > 0
+                  ? journal.focusAreas.join(", ")
+                  : "Topics coming soon"}
+              </p>
             </div>
+          </div>
         </div>
         <div className="rounded-2xl border border-[#e0e5f2] bg-white/80 px-4 py-3 shadow-sm">
           <div className="flex items-start gap-3">
             <Layers3 className="mt-0.5 size-4 text-[#24315f]" />
             <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                  Latest publication
-                </p>
-                <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
-                  {journal.latestIssueLabel ?? "Publication details coming soon"}
-                </p>
-              </div>
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                Latest publication
+              </p>
+              <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
+                {journal.latestIssueLabel ?? "Publication details coming soon"}
+              </p>
             </div>
+          </div>
         </div>
       </CardContent>
       <CardFooter className="border-t border-white/70 bg-white/35 pb-6 pt-5">

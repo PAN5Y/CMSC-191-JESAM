@@ -8,6 +8,7 @@ import {
   matchesPublicArticleSearchResult,
   matchesPublicArticleSearchFilters,
 } from "../../src/modules/journals-dashboard/queries/publicSearchResultMatchers.ts";
+import { mapRowsToPublicArticleSearchResults } from "../../src/modules/journals-dashboard/queries/publicSearchResultMappers.ts";
 import type { PublicArticleSearchResult } from "../../src/modules/journals-dashboard/types.ts";
 
 const sampleResults: PublicArticleSearchResult[] = [
@@ -106,5 +107,53 @@ test("filterPublicArticleSearchResultsWithFilters narrows the applied results", 
 
   assert.deepEqual(filteredResults.map((result) => result.articleId), [
     "article-water",
+  ]);
+});
+
+test("filterPublicArticleSearchResultsWithFilters supports filter-only refinement without a query", () => {
+  const filteredResults = filterPublicArticleSearchResultsWithFilters(
+    sampleResults,
+    "",
+    {
+      classification: "Water",
+      journalId: "",
+      coverageYear: "2026",
+    }
+  );
+
+  assert.deepEqual(filteredResults.map((result) => result.articleId), [
+    "article-water",
+  ]);
+});
+
+test("mapRowsToPublicArticleSearchResults preserves public journal identity and shapes excerpts", () => {
+  const mappedResults = mapRowsToPublicArticleSearchResults([
+    {
+      journal_id: "jesam-water",
+      journal_title: "JESAM Water and Coastal Research",
+      id: "article-water",
+      title: "Coastal Monitoring for Estuary Restoration",
+      authors: ["Lia Ramos", "Paolo Dizon"],
+      abstract:
+        "A coastal monitoring framework for estuary restoration that compares water-quality signals and shoreline pressure.",
+      classification: "Water",
+      published_at: "2026-04-08T00:00:00.000Z",
+      issue_assignment: "Vol. 32 No. 2",
+    },
+  ]);
+
+  assert.deepEqual(mappedResults, [
+    {
+      articleId: "article-water",
+      title: "Coastal Monitoring for Estuary Restoration",
+      authors: ["Lia Ramos", "Paolo Dizon"],
+      journalId: "jesam-water",
+      journalTitle: "JESAM Water and Coastal Research",
+      classification: "Water",
+      publishedAt: "2026-04-08T00:00:00.000Z",
+      issueLabel: "Vol. 32 No. 2",
+      abstractExcerpt:
+        "A coastal monitoring framework for estuary restoration that compares water-quality signals and shoreline pressure.",
+    },
   ]);
 });

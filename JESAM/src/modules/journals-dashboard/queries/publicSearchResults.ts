@@ -3,55 +3,14 @@ import type {
   PublicArticleSearchResult,
   PublicJournalFilters,
 } from "../types";
-import { derivePublicJournalIdentity } from "./publicJournals";
 import {
   comparePublicArticleSearchResults,
   filterPublicArticleSearchResultsWithFilters,
 } from "./publicSearchResultMatchers";
 import {
-  normalizePublicJournalFocusArea,
-  sanitizeAuthors,
-  toAbstractExcerpt,
-} from "./publicSearchShared";
-
-interface PublicSearchResultRow {
-  journal_id: string;
-  journal_title?: string | null;
-  id: string;
-  title: string;
-  authors: unknown;
-  abstract: string | null;
-  classification: unknown;
-  published_at: string | null;
-  issue_assignment: string | null;
-}
-
-export function mapRowsToPublicArticleSearchResults(
-  rows: PublicSearchResultRow[]
-): PublicArticleSearchResult[] {
-  return rows
-    .map((row) => {
-      const classification = normalizePublicJournalFocusArea(row.classification);
-      const derivedJournal = derivePublicJournalIdentity(
-        row.journal_id,
-        classification,
-        row.journal_title
-      );
-
-      return {
-        articleId: row.id,
-        title: row.title,
-        authors: sanitizeAuthors(row.authors),
-        journalId: derivedJournal.id,
-        journalTitle: derivedJournal.title,
-        classification: classification ?? undefined,
-        publishedAt: row.published_at,
-        issueLabel: row.issue_assignment,
-        abstractExcerpt: toAbstractExcerpt(row.abstract),
-      } satisfies PublicArticleSearchResult;
-    })
-    .sort(comparePublicArticleSearchResults);
-}
+  mapRowsToPublicArticleSearchResults,
+  type PublicSearchResultRow,
+} from "./publicSearchResultMappers";
 
 export async function fetchPublicArticleSearchResults(
   appliedQuery: string,
@@ -71,7 +30,7 @@ export async function fetchPublicArticleSearchResults(
 
   const mappedResults = mapRowsToPublicArticleSearchResults(
     (data ?? []) as PublicSearchResultRow[]
-  );
+  ).sort(comparePublicArticleSearchResults);
 
   return filterPublicArticleSearchResultsWithFilters(
     mappedResults,

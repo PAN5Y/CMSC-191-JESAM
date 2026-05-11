@@ -7,11 +7,7 @@ export interface PublicJournalFilters {
 }
 
 export type PublicJournalSearchableField =
-  | "article-title"
-  | "authors"
-  | "abstract-excerpt"
   | "journal-title"
-  | "journal-context"
   | "journal-description"
   | "institution"
   | "classification"
@@ -44,6 +40,12 @@ export interface PublicJournalArticlePreview {
   issueLabel: string | null;
 }
 
+export type PublicArticleDownloadAvailabilityStatus =
+  | "available"
+  | "unavailable"
+  | "unknown"
+  | "temporary-failure";
+
 export interface PublicArticleDetail {
   id: string;
   journalId: string;
@@ -51,11 +53,15 @@ export interface PublicArticleDetail {
   title: string;
   authors: string[];
   abstract?: string;
+  summary?: string;
   classification?: PublicJournalFocusArea;
   publishedAt: string | null;
   issueLabel: string | null;
   doi?: string;
   keywords: string[];
+  downloadAvailabilityStatus: PublicArticleDownloadAvailabilityStatus;
+  isDownloadable: boolean;
+  downloadUrl?: string;
 }
 
 export interface PublicArticleSearchResult {
@@ -90,11 +96,15 @@ export interface PublicArticleDetailRouteState {
   returnLabel?: string;
   journalId?: string;
   journalTitle?: string;
+  journalDetailReturnTo?: string;
+  journalDetailReturnLabel?: string;
+  journalLocalSearchQuery?: string;
 }
 
 export interface PublicJournalDetailRouteState {
   returnTo?: string;
   returnLabel?: string;
+  localSearchQuery?: string;
 }
 
 export interface PublicJournalSearchState {

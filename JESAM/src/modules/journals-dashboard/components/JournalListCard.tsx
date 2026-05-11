@@ -59,7 +59,7 @@ export default function JournalListCard({
   return (
     <Card className="overflow-hidden border-[#d8deef] bg-[linear-gradient(180deg,#ffffff_0%,#fafbff_58%,#f6efe1_150%)] shadow-[0_22px_55px_rgba(36,49,95,0.1)]">
       <div className="h-1 w-full bg-[linear-gradient(90deg,#24315f_0%,#7b89b8_55%,#d7c4a3_100%)]" />
-      <CardHeader className="gap-4 pb-5">
+      <CardHeader className="gap-4 pb-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-[#24315f] text-white hover:bg-[#24315f]">
             Journal Collection
@@ -81,13 +81,13 @@ export default function JournalListCard({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6 pb-5">
+      <CardContent className="space-y-5 pb-5">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-[#e0e5f2] bg-white/80 px-4 py-3 shadow-sm">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Publisher
             </p>
-            <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
+            <p className="mt-2 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
               {journal.institution}
             </p>
           </div>
@@ -95,7 +95,7 @@ export default function JournalListCard({
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               ISSN
             </p>
-            <p className="mt-1 font-['Public_Sans',sans-serif] text-sm text-slate-700">
+            <p className="mt-2 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
               {journal.issn ?? "Not listed"}
             </p>
           </div>
@@ -103,7 +103,7 @@ export default function JournalListCard({
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Published papers
             </p>
-            <p className="mt-1 font-['Newsreader',serif] text-3xl text-[#24315f]">
+            <p className="mt-2 font-['Newsreader',serif] text-3xl leading-none text-[#24315f]">
               {journal.totalPublishedArticles}
             </p>
           </div>
@@ -111,7 +111,7 @@ export default function JournalListCard({
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Coverage
             </p>
-            <p className="mt-1 font-['Public_Sans',sans-serif] text-sm text-slate-700">
+            <p className="mt-2 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
               {formatCoverageYears(journal.coverageYears)}
             </p>
           </div>
@@ -149,20 +149,21 @@ export default function JournalListCard({
               <CalendarDays className="mt-0.5 size-4 text-[#24315f]" />
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                  Latest Publication
+                  Latest publication
                 </p>
-                <p className="mt-1 font-['Public_Sans',sans-serif] text-sm text-slate-700">
+                <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
                   {formatPublishedDate(journal.latestPublicationDate)}
                 </p>
               </div>
             </div>
+
             <div className="flex items-start gap-3 rounded-2xl border border-white/70 bg-white/65 px-4 py-3">
               <Layers3 className="mt-0.5 size-4 text-[#24315f]" />
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
                   Latest publication details
                 </p>
-                <p className="mt-1 font-['Public_Sans',sans-serif] text-sm text-slate-700">
+                <p className="mt-1 font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-700">
                   {journal.latestIssueLabel ?? "Publication details coming soon"}
                 </p>
               </div>
@@ -171,8 +172,8 @@ export default function JournalListCard({
         </div>
       </CardContent>
 
-      <CardFooter className="flex items-start justify-between gap-4 border-t border-white/70 bg-white/35 pb-6 pt-5">
-        <p className="font-['Public_Sans',sans-serif] text-sm text-slate-600">
+      <CardFooter className="flex items-start justify-between gap-4 border-t border-white/70 bg-white/35 pb-5 pt-4">
+        <p className="font-['Public_Sans',sans-serif] text-sm leading-6 text-slate-600">
           Open this journal to browse its published paper previews before you
           open a full paper page.
         </p>

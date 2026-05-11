@@ -73,3 +73,13 @@ export function toAbstractExcerpt(abstract: string | null) {
 
   return `${trimmed.slice(0, MAX_ABSTRACT_PREVIEW_LENGTH).trimEnd()}...`;
 }
+
+export function toOptionalSummaryText(summary: string | null | undefined) {
+  if (typeof summary !== "string") {
+    return undefined;
+  }
+
+  const trimmed = summary.trim();
+
+  return trimmed.length > 0 ? trimmed : undefined;
+}
