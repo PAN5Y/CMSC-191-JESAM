@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
-import type { AutomatedCheckSnapshot } from "@/types";
+import type { AutomatedCheckSnapshot, TemplateCheckReport } from "@/types";
 import { ManuscriptTracker } from "../components/ManuscriptTracker";
 import { RevisionAutomatedChecks } from "../components/RevisionAutomatedChecks";
 import {
@@ -85,7 +85,11 @@ export default function RevisionDashboard() {
     checks: AutomatedCheckSnapshot;
     pass: boolean;
     similarityScore: number;
+    templateReport?: TemplateCheckReport;
   } | null>(null);
+  const [checkingCheckFile, setCheckingCheckFile] = useState<File | null>(null);
+  const [loadingCheckingFile, setLoadingCheckingFile] = useState(false);
+  const [checkingFileError, setCheckingFileError] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
   const [editorialSummary, setEditorialSummary] = useState("");
   const [editorialMajor, setEditorialMajor] = useState("");
@@ -100,6 +104,7 @@ export default function RevisionDashboard() {
         checks: AutomatedCheckSnapshot;
         pass: boolean;
         similarityScore: number;
+        templateReport?: TemplateCheckReport;
       } | null,
     ) => {
       setRevisionCheckResult(r);
@@ -111,6 +116,12 @@ export default function RevisionDashboard() {
     () => manuscripts.find((m) => m.id === selectedId) ?? manuscripts[0],
     [manuscripts, selectedId],
   );
+
+  useEffect(() => {
+    setRevisionCheckResult(null);
+    setCheckingCheckFile(null);
+    setCheckingFileError("");
+  }, [selected?.id]);
 
   const selectedNeedsEditorialReview = selected
     ? manuscriptNeedsEditorialReview(selected)
@@ -137,6 +148,42 @@ export default function RevisionDashboard() {
   const selectedIntakeFormatResubmit = selected
     ? intakeReturnedAuthorResubmitGoesToFormatQueue(selected)
     : false;
+
+  const runEditorAutomatedChecks = useCallback(async () => {
+    if (!selected?.file_url) {
+      setCheckingFileError("No revised manuscript file is available to check.");
+      return;
+    }
+
+    setLoadingCheckingFile(true);
+    setCheckingFileError("");
+    setRevisionCheckResult(null);
+    setCheckingCheckFile(null);
+
+    try {
+      const response = await fetch(selected.file_url);
+      if (!response.ok) {
+        throw new Error("Could not load the revised manuscript file.");
+      }
+
+      const blob = await response.blob();
+      const rawName =
+        selected.file_url.split("/").pop()?.split("?")[0] ||
+        `${selected.reference_code ?? selected.id}-revision.pdf`;
+      const file = new File([blob], decodeURIComponent(rawName), {
+        type: blob.type || "application/pdf",
+      });
+      setCheckingCheckFile(file);
+    } catch (error) {
+      setCheckingFileError(
+        error instanceof Error
+          ? error.message
+          : "Could not load the revised manuscript file.",
+      );
+    } finally {
+      setLoadingCheckingFile(false);
+    }
+  }, [selected]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -804,7 +851,6 @@ export default function RevisionDashboard() {
                         className="sr-only"
                         onChange={(e) => {
                           setRevisionFile(e.target.files?.[0] ?? null);
-                          setRevisionCheckResult(null);
                         }}
                       />
                     </label>
@@ -828,11 +874,6 @@ export default function RevisionDashboard() {
                       </p>
                     )}
                   </div>
-                  <RevisionAutomatedChecks
-                    file={revisionFile}
-                    manuscriptKey={selected.id}
-                    onResult={onRevisionChecksResult}
-                  />
                   <textarea
                     value={authorNote}
                     onChange={(e) => setAuthorNote(e.target.value)}
@@ -849,20 +890,14 @@ export default function RevisionDashboard() {
                   />
                   <button
                     type="button"
-                    disabled={
-                      !authorNote.trim() ||
-                      !revisionFile ||
-                      !revisionCheckResult?.pass
-                    }
+                    disabled={!authorNote.trim() || !revisionFile}
                     onClick={() =>
                       void (async () => {
-                        if (!revisionFile || !revisionCheckResult?.pass) return;
+                        if (!revisionFile) return;
                         const ok = await submitRevision(selected, {
                           authorNote,
                           responseLetter: responseLetter.trim() || undefined,
                           file: revisionFile,
-                          automatedChecks: revisionCheckResult.checks,
-                          similarityScore: revisionCheckResult.similarityScore,
                         });
                         if (ok) {
                           setAuthorNote("");
@@ -1003,9 +1038,45 @@ export default function RevisionDashboard() {
                     </h3>
                     <p className="text-sm text-teal-800 mt-1">
                       The author has submitted their revised manuscript.
-                      Complete the final review and decide to approve or return
-                      for further revisions.
+                      Run automated checks, then complete the final review and
+                      decide to approve or return for further revisions.
                     </p>
+                  </div>
+                  <div className="rounded-lg border border-teal-100 bg-white/70 px-4 py-3 space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-teal-950">
+                          Automated checks
+                        </p>
+                        <p className="text-xs text-teal-800 mt-0.5">
+                          Run these checks against the latest revised file
+                          before approving the manuscript.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={loadingCheckingFile || !selected.file_url}
+                        onClick={() => void runEditorAutomatedChecks()}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-teal-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-teal-800 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+                      >
+                        {loadingCheckingFile
+                          ? "Loading file..."
+                          : revisionCheckResult
+                            ? "Run checks again"
+                            : "Run automated checks"}
+                      </button>
+                    </div>
+                    {checkingFileError && (
+                      <p className="text-xs text-red-700">
+                        {checkingFileError}
+                      </p>
+                    )}
+                    <RevisionAutomatedChecks
+                      file={checkingCheckFile}
+                      manuscriptKey={selected.id}
+                      fileUrl={selected.file_url}
+                      onResult={onRevisionChecksResult}
+                    />
                   </div>
                   <label className="block text-sm text-gray-700">
                     Summary
@@ -1040,17 +1111,25 @@ export default function RevisionDashboard() {
                   <div className="flex gap-3 flex-wrap">
                     <button
                       type="button"
-                      disabled={!checkingSummary.trim()}
+                      disabled={
+                        !checkingSummary.trim() || !revisionCheckResult?.pass
+                      }
                       onClick={() =>
                         void submitCheckingDecision(selected, "approve", {
                           summary: checkingSummary,
                           majorConcerns: checkingMajor,
                           minorConcerns: checkingMinor,
+                          automatedChecks: revisionCheckResult?.checks,
+                          similarityScore:
+                            revisionCheckResult?.similarityScore,
+                          templateReport: revisionCheckResult?.templateReport,
                         }).then((ok) => {
                           if (ok) {
                             setCheckingSummary("");
                             setCheckingMajor("");
                             setCheckingMinor("");
+                            setRevisionCheckResult(null);
+                            setCheckingCheckFile(null);
                           }
                         })
                       }
@@ -1080,11 +1159,17 @@ export default function RevisionDashboard() {
                           summary: checkingSummary,
                           majorConcerns: checkingMajor,
                           minorConcerns: checkingMinor,
+                          automatedChecks: revisionCheckResult?.checks,
+                          similarityScore:
+                            revisionCheckResult?.similarityScore,
+                          templateReport: revisionCheckResult?.templateReport,
                         }).then((ok) => {
                           if (ok) {
                             setCheckingSummary("");
                             setCheckingMajor("");
                             setCheckingMinor("");
+                            setRevisionCheckResult(null);
+                            setCheckingCheckFile(null);
                           }
                         })
                       }

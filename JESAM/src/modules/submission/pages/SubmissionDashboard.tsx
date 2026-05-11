@@ -11,6 +11,7 @@ const AUTHOR_ACTION_STATUSES = new Set<ManuscriptStatus>([
   "Revision Requested",
   "Returned to Author",
   "Return to Revision",
+  "Author Galley Review",
 ]);
 
 function pct(part: number, whole: number) {
@@ -357,7 +358,13 @@ export default function SubmissionDashboard() {
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => navigate("/revision")}
+                      onClick={() =>
+                        navigate(
+                          m.status === "Author Galley Review"
+                            ? `/author/article/${m.id}`
+                            : "/revision"
+                        )
+                      }
                       className="cursor-pointer text-left rounded-lg border border-orange-200 bg-white p-4 hover:border-orange-300 hover:bg-orange-50"
                     >
                       <p className="text-sm font-medium text-gray-900 line-clamp-1">{m.title}</p>

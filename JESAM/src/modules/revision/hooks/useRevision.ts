@@ -4,6 +4,7 @@ import type {
   AutomatedCheckSnapshot,
   Manuscript,
   ManuscriptStatus,
+  TemplateCheckReport,
 } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubmissions } from "@/modules/submission/hooks/useSubmissions";
@@ -174,8 +175,6 @@ export function useRevision() {
         authorNote: string;
         responseLetter?: string;
         file: File;
-        automatedChecks?: AutomatedCheckSnapshot;
-        similarityScore?: number;
       },
     ) => {
       const uid = user?.id;
@@ -189,20 +188,6 @@ export function useRevision() {
       }
       const isProductionFormatRevision =
         manuscript.status === "For Format Revision";
-      const ac = payload.automatedChecks;
-      if (!isProductionFormatRevision) {
-        if (
-          !ac ||
-          ac.formatting.status !== "passed" ||
-          ac.assets.status !== "passed" ||
-          ac.plagiarism.status !== "passed"
-        ) {
-          toast.error(
-            "Automated checks must all pass before submitting a revision.",
-          );
-          return false;
-        }
-      }
 
       const revisionNumber = await getNextRevisionNumber(manuscript.id);
       const { publicUrl, error: uploadError } =
@@ -290,12 +275,6 @@ export function useRevision() {
               rounds: [],
             }
           : undefined,
-        automated_checks: isProductionFormatRevision
-          ? undefined
-          : payload.automatedChecks,
-        similarity_score: isProductionFormatRevision
-          ? undefined
-          : payload.similarityScore,
         notifications: appendNotification(manuscript, {
           type: "revision-submitted",
           recipientRole: isProductionFormatRevision
@@ -315,11 +294,9 @@ export function useRevision() {
         ),
       });
       delete nextMeta.template_check_report;
-      if (isProductionFormatRevision) {
-        delete nextMeta.automated_checks;
-        delete nextMeta.similarity_score;
-        delete nextMeta.production_check_summary;
-      }
+      delete nextMeta.automated_checks;
+      delete nextMeta.similarity_score;
+      if (isProductionFormatRevision) delete nextMeta.production_check_summary;
       const ok = await save(manuscript.id, {
         status: nextStatus,
         file_url: publicUrl,
@@ -393,7 +370,14 @@ export function useRevision() {
     async (
       manuscript: Manuscript,
       decision: "approve" | "send-back",
-      review: { summary: string; majorConcerns: string; minorConcerns: string },
+      review: {
+        summary: string;
+        majorConcerns: string;
+        minorConcerns: string;
+        automatedChecks?: AutomatedCheckSnapshot;
+        similarityScore?: number;
+        templateReport?: TemplateCheckReport;
+      },
     ) => {
       if (manuscript.status !== "Checking") {
         toast.error("Manuscript is not in Checking status.");
@@ -402,7 +386,26 @@ export function useRevision() {
       const ref = manuscript.reference_code ?? manuscript.id;
       const nextStatus: ManuscriptStatus =
         decision === "approve" ? "In Layout" : "Revision Requested";
+      if (decision === "approve") {
+        const ac = review.automatedChecks;
+        if (
+          !ac ||
+          ac.formatting.status !== "passed" ||
+          ac.assets.status !== "passed" ||
+          ac.plagiarism.status !== "passed"
+        ) {
+          toast.error(
+            "Automated checks must all pass before approving the revision.",
+          );
+          return false;
+        }
+      }
       const nextMeta = metadataPatch(manuscript, {
+        automated_checks: review.automatedChecks,
+        similarity_score: review.similarityScore,
+        template_check_report:
+          review.templateReport ??
+          manuscript.submission_metadata?.template_check_report,
         checking_review: {
           summary: review.summary,
           majorConcerns: review.majorConcerns,
