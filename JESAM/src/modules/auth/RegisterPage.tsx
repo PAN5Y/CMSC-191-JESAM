@@ -4,7 +4,12 @@ import { useAuth, type SignUpData } from "@/contexts/AuthContext";
 import type { AppRole } from "@/modules/publication-impact/types";
 import type { JournalClassification } from "@/types";
 
-const SESAM_FOCUS_OPTIONS: JournalClassification[] = ["Land", "Air", "Water", "People"];
+const SESAM_FOCUS_OPTIONS: JournalClassification[] = [
+  "Land",
+  "Air",
+  "Water",
+  "People",
+];
 
 const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "author", label: "Author" },
@@ -24,7 +29,7 @@ const labelClasses =
 
 function AuthVisualPanel() {
   return (
-    <div className="relative min-h-40 bg-[#1f352c] lg:min-h-[820px]">
+    <div className="relative min-h-40 bg-[#1f352c] lg:h-full lg:min-h-0">
       <img
         src="/JESAM Collage.png"
         alt=""
@@ -35,7 +40,8 @@ function AuthVisualPanel() {
           JESAM
         </p>
         <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/80">
-          Join the editorial and scholarly community supporting environmental science.
+          Join the editorial and scholarly community supporting environmental
+          science.
         </p>
       </div>
     </div>
@@ -54,7 +60,9 @@ export default function RegisterPage() {
   const [affiliation, setAffiliation] = useState("");
   const [orcidId, setOrcidId] = useState("");
   const [role, setRole] = useState<AppRole>("author");
-  const [reviewExpertise, setReviewExpertise] = useState<JournalClassification | "">("");
+  const [reviewExpertise, setReviewExpertise] = useState<
+    JournalClassification | ""
+  >("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -89,7 +97,8 @@ export default function RegisterPage() {
       affiliation: affiliation || undefined,
       orcid_id: orcidId || undefined,
       role,
-      review_expertise: role === "reviewer" && reviewExpertise ? reviewExpertise : undefined,
+      review_expertise:
+        role === "reviewer" && reviewExpertise ? reviewExpertise : undefined,
     };
 
     const result = await signUp(payload);
@@ -105,7 +114,7 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1a1c1c] via-[#2d3a6b] to-[#3f4b7e] flex items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:grid-cols-[312px_minmax(520px,1fr)]">
+        <div className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:h-[720px] lg:grid-cols-[274px_minmax(520px,1fr)]">
           <AuthVisualPanel />
           <div className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
             <div className="w-full max-w-md text-center">
@@ -147,10 +156,10 @@ export default function RegisterPage() {
       <div className="w-full max-w-7xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:grid-cols-[312px_minmax(640px,1fr)]">
         <AuthVisualPanel />
 
-        <div className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
+        <div className="flex items-start justify-center overflow-y-auto px-5 py-8 sm:px-8 lg:h-full lg:px-12">
           <div className="w-full max-w-3xl">
             <img
-              src="/UPLB LOGO w SESAM.png"
+              src="logos/UPLB LOGO w SESAM.png"
               alt="UPLB School of Environmental Science and Management"
               width={2281}
               height={627}
@@ -200,7 +209,10 @@ export default function RegisterPage() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
                 <div>
-                  <label htmlFor="register-middle-name" className={labelClasses}>
+                  <label
+                    htmlFor="register-middle-name"
+                    className={labelClasses}
+                  >
                     Middle Name
                   </label>
                   <input
@@ -298,7 +310,8 @@ export default function RegisterPage() {
                 {role === "reviewer" && (
                   <div>
                     <label className={labelClasses}>
-                      SESAM review expertise <span className="text-[#c62828]">*</span>
+                      SESAM review expertise{" "}
+                      <span className="text-[#c62828]">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {SESAM_FOCUS_OPTIONS.map((opt) => (
