@@ -159,7 +159,7 @@ export default function RegisterPage() {
         <div className="flex items-start justify-center overflow-y-auto px-5 py-8 sm:px-8 lg:h-full lg:px-12">
           <div className="w-full max-w-3xl">
             <img
-              src="logos/UPLB LOGO w SESAM.png"
+              src="/logos/UPLB LOGO w SESAM.png"
               alt="UPLB School of Environmental Science and Management"
               width={2281}
               height={627}
