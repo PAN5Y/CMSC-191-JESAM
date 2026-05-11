@@ -53,7 +53,16 @@ export async function listManuscriptsFromDb(
   if (status) {
     query = query.eq("status", status);
   } else if (role === "technical_editor") {
-    query = query.in("status", ["Peer Review", "Revision Requested"]);
+    query = query.in("status", [
+      "Peer Review",
+      "Peer Review in Progress",
+      "Review Conducted",
+      "Editorial Review",
+      "Revision Requested",
+      "Checking",
+      "Returned to Author",
+      "Return to Revision",
+    ]);
   } else if (publicationStatusesOnly) {
     const pub = [
       "In Layout",

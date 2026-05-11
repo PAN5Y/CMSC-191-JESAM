@@ -596,42 +596,6 @@ export function usePeerReview() {
     [save, fetchManuscripts],
   );
 
-  /**
-   * Completes the 1-week editorial review stage.
-   * Moves manuscript from 'Editorial Review' → 'Accepted' and appends author notification.
-   */
-  const completeEditorialReview = useCallback(
-    async (manuscript: Manuscript, editorNote: string) => {
-      if (manuscript.status !== "Editorial Review") {
-        toast.error("Manuscript is not in the Editorial Review stage.");
-        return false;
-      }
-      const nextMeta = mergeSubmissionMeta(
-        manuscript,
-        {
-          notifications: appendNotification(manuscript, {
-            type: "accepted",
-            recipientRole: "author",
-            message: `Your manuscript ${
-              manuscript.reference_code ?? manuscript.id
-            } has been accepted for publication after editorial review.`,
-          }),
-          audit_logs: appendAudit(
-            manuscript,
-            "editor",
-            "editorial-review-completed",
-            editorNote,
-          ),
-        },
-        true,
-      );
-      return save(manuscript.id, {
-        status: "Accepted",
-        submission_metadata: nextMeta as unknown as Record<string, unknown>,
-      });
-    },
-    [save],
-  );
 
   const sendReviewReminder = useCallback(
     async (manuscript: Manuscript, invitationId: string) => {
@@ -678,7 +642,6 @@ export function usePeerReview() {
     respondInvitation,
     submitReviewerFeedback,
     makeEditorialDecision,
-    completeEditorialReview,
     startPostRevisionPeerReviewRound,
     sendReviewReminder,
   };
