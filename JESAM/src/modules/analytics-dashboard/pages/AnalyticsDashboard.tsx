@@ -109,13 +109,6 @@ function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-function formatDuration(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds % 60);
-  return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
-}
-
 function filterByTimeRange(manuscripts: Manuscript[], range: TimeRange): Manuscript[] {
   if (range === "all") return manuscripts;
   const days = range === "30d" ? 30 : range === "90d" ? 90 : 365;
@@ -258,6 +251,42 @@ function KpiCard({
         <p className="text-xs text-gray-400 mt-1.5 pl-4">{sub}</p>
       )}
     </Card>
+  );
+}
+
+function GaKpiCard({
+  label,
+  value,
+  sub,
+  accentColor,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accentColor: string;
+}) {
+  return (
+    <div className="relative min-h-[132px] overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div
+        className="absolute inset-y-0 left-0 w-1"
+        style={{ backgroundColor: accentColor }}
+      />
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
+            {label}
+          </p>
+          {sub && <p className="text-xs text-gray-400 mt-1 truncate">{sub}</p>}
+        </div>
+        <span
+          className="h-9 w-9 rounded-full flex-shrink-0"
+          style={{ backgroundColor: `${accentColor}18` }}
+        />
+      </div>
+      <p className="mt-4 text-3xl font-bold text-gray-950 leading-none">
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -440,42 +469,30 @@ export default function AnalyticsDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KpiCard
+              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <GaKpiCard
                   label="Site Views"
                   value={gaLoading ? "..." : (gaSummary?.totals.pageViews ?? 0).toLocaleString()}
                   sub="GA4 page views"
                   accentColor={BRAND}
                 />
-                <KpiCard
+                <GaKpiCard
                   label="Active Users"
                   value={gaLoading ? "..." : (gaSummary?.totals.activeUsers ?? 0).toLocaleString()}
                   sub="Visitors"
                   accentColor="#38bdf8"
                 />
-                <KpiCard
+                <GaKpiCard
                   label="Paper Views"
                   value={gaLoading ? "..." : (gaSummary?.totals.paperViews ?? 0).toLocaleString()}
                   sub="paper_view events"
                   accentColor="#34d399"
                 />
-                <KpiCard
-                  label="Events"
-                  value={gaLoading ? "..." : (gaSummary?.totals.events ?? 0).toLocaleString()}
-                  sub="All GA events"
-                  accentColor="#F5C344"
-                />
-                <KpiCard
+                <GaKpiCard
                   label="Engagement"
                   value={gaLoading ? "..." : formatPercent(gaSummary?.totals.engagementRate ?? 0)}
                   sub="Engagement rate"
                   accentColor="#fb923c"
-                />
-                <KpiCard
-                  label="Avg Session"
-                  value={gaLoading ? "..." : formatDuration(gaSummary?.totals.averageSessionDuration ?? 0)}
-                  sub="Visit duration"
-                  accentColor="#818cf8"
                 />
               </div>
 
