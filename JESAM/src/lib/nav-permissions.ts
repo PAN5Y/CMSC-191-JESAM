@@ -32,7 +32,7 @@ export function getSidebarItems(
     return [
       { icon: Upload, label: "Submission", to: "/author" },
       { icon: Edit, label: "Revision", to: "/revision" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
   }
@@ -40,7 +40,7 @@ export function getSidebarItems(
   if (role === "reviewer") {
     return [
       { icon: Users, label: "Peer Review", to: "/peer-review/reviewer" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
   }
@@ -60,8 +60,8 @@ export function getSidebarItems(
       { icon: Upload, label: "Submission", to: "/submission/queue" },
       { icon: Users, label: "Peer Review", to: "/peer-review" },
       { icon: Edit, label: "Revision", to: "/revision" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
@@ -80,7 +80,7 @@ export function getSidebarItems(
     return [
       { icon: Users, label: "Peer Review", to: "/peer-review" },
       { icon: Edit, label: "Revision", to: "/revision" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
@@ -94,7 +94,7 @@ export function getSidebarItems(
         to: "/production/pre-review",
       },
       { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
-      { icon: BookOpen, label: "Browse journals", to: "/browse" },
+      { icon: BookOpen, label: "Browse journals", to: "/journals" },
       { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
       { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
     ];
@@ -111,7 +111,7 @@ export function getSidebarItems(
       to: "/production/pre-review",
     },
     { icon: FileCheck, label: "Publication", to: "/publication/dashboard" },
-    { icon: BookOpen, label: "Browse journals", to: "/browse" },
+    { icon: BookOpen, label: "Browse journals", to: "/journals" },
     { icon: BarChart3, label: "Analytics Dashboard", to: "/analytics" },
     { icon: HelpCircle, label: "AI Chatbot", to: "/ai-chatbot" },
   ];
