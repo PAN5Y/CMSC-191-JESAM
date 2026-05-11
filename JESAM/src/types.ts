@@ -4,32 +4,56 @@
  */
 
 export type ManuscriptStatus =
+  | "Initial Screening"
   | "Pending Format Verification"
   | "Editor In Chief Screening"
+  | "Production Checks"
+  | "For Format Revision"
   | "Peer Review"
+  | "Peer Review in Progress"
+  | "Review Conducted"
+  | "Editorial Review"
   | "Revision Requested"
+  | "Checking"
   | "Returned to Author"
   | "Rejected"
+  | "Editorial Review"
   | "Accepted"
+  | "In Layout"
   | "In Production"
+  | "In Layout"
+  | "Proofreading"
+  | "Author Galley Review"
+  | "Scheduled for Publication"
+  | "In Issue Management"
   | "Published"
+  | "Archived"
   | "Return to Revision"
-  | "Retracted";
+  | "Retracted"
+  | "Declined";
 
 /** Statuses shown on Publication & Impact dashboard (post-acceptance pipeline). */
 export const PUBLICATION_PIPELINE_STATUSES: ManuscriptStatus[] = [
   "Accepted",
   "In Production",
+  "In Layout",
+  "Proofreading",
+  "Author Galley Review",
+  "Scheduled for Publication",
+  "In Issue Management",
   "Published",
   "Return to Revision",
   "Retracted",
+  "Declined"
 ];
 
 export type AppRole =
   | "author"
   | "reviewer"
   | "associate_editor"
+  | "technical_editor"
   | "managing_editor"
+  | "technical_editor"
   | "production_editor"
   | "editor_in_chief"
   | "system_admin";
@@ -60,6 +84,17 @@ export interface ManuscriptMetrics {
   last_updated?: string;
 }
 
+/** A galley version row from manuscript_revision_versions (publication pipeline). */
+export interface GalleyVersion {
+  id: string;
+  manuscript_id: string;
+  revision_number: number;
+  file_url: string;
+  author_note: string;
+  submitter_id: string | null;
+  submitted_at: string;
+}
+
 /** Rich author line items stored inside submission_metadata (not duplicated on authors array). */
 export interface SubmissionAuthorDetail {
   id: string;
@@ -74,6 +109,37 @@ export interface AutomatedCheckSnapshot {
   formatting: { status: string; message: string };
   assets: { status: string; message: string };
   plagiarism: { status: string; message: string };
+}
+
+export interface TemplateCheckIssue {
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+}
+
+export interface TemplateCheckReport {
+  passed: boolean;
+  score: number;
+  checkedAt: string;
+  templatePath: string;
+  requiredSections: Array<{ name: string; found: boolean; order: number | null }>;
+  headingSequence: string[];
+  figureCaptions: string[];
+  tableCaptions: string[];
+  imageCount: number;
+  wordCount: number;
+  substantiveWordCount?: number;
+  redTemplateHintsRemaining?: string[];
+  templateInstructionsRemaining?: string[];
+  formatting?: {
+    directFontSamples: number;
+    directSizeSamples: number;
+    directLineSpacingSamples: number;
+    timesNewRomanRatio: number;
+    size12Ratio: number;
+    doubleSpacingRatio: number;
+  };
+  issues: TemplateCheckIssue[];
 }
 
 export type ReviewerRecommendation =
@@ -112,7 +178,7 @@ export interface PeerReviewRound {
   targetReviewerCount: number;
   invitations: ReviewInvitation[];
   submissions: ReviewSubmission[];
-  editorDecision?: "accept" | "revise" | "reject" | "additional-reviewer";
+  editorDecision?: "minor-revision" | "major-revision" | "reject";
   editorDecisionNote?: string;
   decidedAt?: string;
 }
@@ -131,14 +197,14 @@ export interface RevisionVersion {
 export interface NotificationEvent {
   id: string;
   type:
-    | "submission-received"
-    | "screening-decision"
-    | "review-invitation"
-    | "review-submitted"
-    | "revision-requested"
-    | "revision-submitted"
-    | "accepted"
-    | "published";
+  | "submission-received"
+  | "screening-decision"
+  | "review-invitation"
+  | "review-submitted"
+  | "revision-requested"
+  | "revision-submitted"
+  | "accepted"
+  | "published";
   recipientRole: AppRole | "public";
   recipientEmail?: string;
   message: string;
@@ -161,6 +227,7 @@ export interface SubmissionMetadata {
   ethicalApprovals?: string;
   author_details?: SubmissionAuthorDetail[];
   automated_checks?: AutomatedCheckSnapshot;
+  template_check_report?: TemplateCheckReport;
   similarity_score?: number;
   declarations?: {
     noCompetingInterests?: boolean;
@@ -168,11 +235,29 @@ export interface SubmissionMetadata {
     dataAvailability?: boolean;
     authorshipContribution?: boolean;
   };
+  editorial_review?: {
+    summary: string;
+    majorConcerns: string;
+    minorConcerns: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+  };
+  checking_review?: {
+    summary: string;
+    majorConcerns: string;
+    minorConcerns: string;
+    reviewedAt: string;
+    reviewedBy?: string;
+    decision: "approve" | "send-back";
+  };
   screening_comments?: string;
   rejection_reason?: string;
+  rejection_comments?: string;
   screening_decided_at?: string;
   screening_decided_by?: string;
   editor_verification_comments?: string;
+  production_decision_comments?: string;
+  production_check_summary?: string;
   peer_review?: {
     activeRound?: number;
     rounds: PeerReviewRound[];
@@ -194,7 +279,18 @@ export interface SubmissionMetadata {
     keywords?: string[];
     generatedAt?: string;
   };
+  /** Editor feedback submitted during In Layout / Proofreading stages. */
+  galley_feedback?: {
+    remarks: string;
+    fileUrl?: string;
+    feedbackType: "minor" | "major";
+    submittedBy: string;
+    submittedAt: string;
+  };
+  /** Timestamp of successful DOI deposit with Crossref. */
+  doi_deposited_at?: string;
 }
+
 
 export interface Manuscript {
   id: string;
@@ -214,6 +310,10 @@ export interface Manuscript {
   reference_code?: string | null;
   /** Active peer-review round; relational store mirrors former submission_metadata.peer_review.activeRound */
   peer_review_active_round?: number | null;
+  /** Editor proofreading remarks (DB column on manuscripts table). */
+  editor_remarks?: string | null;
+  /** Author sign-off gate — only flipped true by the author (DB column). */
+  author_approved?: boolean;
   submission_metadata?: SubmissionMetadata | null;
   metrics?: ManuscriptMetrics | null;
 }
@@ -334,6 +434,8 @@ export function normalizeManuscriptRow(row: Record<string, unknown>): Manuscript
         ? null
         : Number(row.peer_review_active_round),
     submission_metadata: parseSubmissionMetadata(row.submission_metadata),
+    editor_remarks: (row.editor_remarks as string) ?? null,
+    author_approved: row.author_approved === true,
     metrics,
   };
 }

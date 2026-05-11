@@ -18,7 +18,9 @@ export type UserRole = AppRole;
 /** Roles that grant access to the Editor / Publication dashboard */
 export const EDITOR_ROLES: UserRole[] = [
   "production_editor",
+  "technical_editor",
   "managing_editor",
+  "technical_editor",
   "associate_editor",
   "editor_in_chief",
   "system_admin",

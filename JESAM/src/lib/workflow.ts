@@ -54,6 +54,11 @@ export function appendNotification(
   return [...notifications, next];
 }
 
+export function getCorrespondingAuthorEmail(manuscript: Manuscript) {
+  const authorDetails = manuscript.submission_metadata?.author_details ?? [];
+  return authorDetails.find((author) => author.isCorresponding)?.email ?? authorDetails[0]?.email;
+}
+
 export function ensurePeerReviewRound(manuscript: Manuscript, targetReviewerCount = PEER_REVIEW_TARGET_COUNT) {
   const prev = manuscript.submission_metadata ?? {};
   const peerReview = prev.peer_review ?? { activeRound: 1, rounds: [] };

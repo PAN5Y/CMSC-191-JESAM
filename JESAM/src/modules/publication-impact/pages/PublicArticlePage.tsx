@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router";
 import {
   Download,
@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Manuscript } from "../types";
 import { CHATBOT_FAQ, answerWorkflowQuestion } from "@/lib/workflow-assistant";
+import { trackPublicPageView, trackPublicPaperView } from "@/lib/analytics";
 
 type RelatedRow = Pick<Manuscript, "id" | "title" | "reference_code" | "classification">;
 
@@ -106,6 +107,7 @@ export default function PublicArticlePage() {
   const [related, setRelated] = useState<RelatedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const trackedPaperId = useRef<string | null>(null);
 
   useEffect(() => {
     async function fetchArticle() {
@@ -169,6 +171,17 @@ export default function PublicArticlePage() {
     }
     void fetchRelated();
   }, [manuscript?.id, manuscript?.classification]);
+
+  useEffect(() => {
+    if (!manuscript) return;
+    if (trackedPaperId.current === manuscript.id) return;
+    trackedPaperId.current = manuscript.id;
+    trackPublicPageView(
+      `/article/public/${manuscript.id}`,
+      `${manuscript.title} | JESAM`
+    );
+    trackPublicPaperView(manuscript);
+  }, [manuscript]);
 
   const handleDownload = async () => {
     if (!manuscript?.file_url || !id) return;

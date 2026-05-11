@@ -1,3 +1,4 @@
+import { jsPDF } from "jspdf";
 import type { User } from "@supabase/supabase-js";
 
 export interface ReviewerCertificateInput {
@@ -6,6 +7,14 @@ export interface ReviewerCertificateInput {
   manuscriptReference: string;
   manuscriptTitle: string;
   completedAtIso: string;
+  affiliation?: string;
+}
+
+export interface ReviewerCertificatePdf {
+  blob: Blob;
+  url: string;
+  filename: string;
+  base64: string;
 }
 
 export function reviewerDisplayNameFromUser(user: User | null): string {
@@ -16,88 +25,143 @@ export function reviewerDisplayNameFromUser(user: User | null): string {
   return s || user?.email?.trim() || "Reviewer";
 }
 
-/**
- * Opens a print dialog with a simple certificate (MVP). Replace HTML with SESAM template when available.
- */
-export function openReviewerCertificatePrint(input: ReviewerCertificateInput): void {
-  const completed = new Date(input.completedAtIso).toLocaleDateString(undefined, {
+export function reviewerAffiliationFromUser(user: User | null): string {
+  const m = user?.user_metadata as Record<string, string | undefined> | undefined;
+  return m?.affiliation?.trim() || "the reviewer directory";
+}
+
+function blobToBase64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read certificate PDF."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function loadHeaderDataUrl() {
+  const response = await fetch("/logos/header.png");
+  if (!response.ok) throw new Error(`Could not load certificate header (${response.status}).`);
+  const buffer = await response.arrayBuffer();
+  const signature = Array.from(new Uint8Array(buffer.slice(0, 8)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  if (signature !== "89504e470d0a1a0a") {
+    throw new Error("Certificate header is not a valid PNG file.");
+  }
+
+  const blob = new Blob([buffer], { type: "image/png" });
+  return new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Could not prepare certificate header image."));
+        return;
+      }
+      ctx.drawImage(image, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not decode certificate header image."));
+    };
+    image.src = url;
+  });
+}
+
+function drawFallbackHeader(doc: jsPDF, pageWidth: number) {
+  doc.setFont("times", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(0, 92, 64);
+  doc.text("School of Environmental Science and Management", pageWidth / 2, 76, {
+    align: "center",
+  });
+  doc.setTextColor(128, 24, 55);
+  doc.setFontSize(12);
+  doc.text("University of the Philippines Los Banos", pageWidth / 2, 94, {
+    align: "center",
+  });
+  doc.setTextColor(0, 0, 0);
+}
+
+function drawBodyParagraph(doc: jsPDF, text: string, x: number, y: number, maxWidth: number) {
+  const lines = doc.splitTextToSize(text, maxWidth) as string[];
+  doc.text(lines, x, y, { align: "left" });
+  return y + lines.length * 17;
+}
+
+export async function generateReviewerCertificatePdf(
+  input: ReviewerCertificateInput
+): Promise<ReviewerCertificatePdf> {
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const date = new Date(input.completedAtIso).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const escapedTitle = escapeHtml(input.manuscriptTitle);
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Certificate of peer review — ${escapeHtml(input.manuscriptReference)}</title>
-  <style>
-    body { font-family: Georgia, 'Times New Roman', serif; margin: 48px; color: #1a1c1c; }
-    h1 { font-size: 1.35rem; text-align: center; margin-bottom: 8px; color: #3f4b7e; }
-    .sub { text-align: center; font-size: 0.9rem; color: #555; margin-bottom: 36px; }
-    .block { margin: 24px 0; line-height: 1.5; }
-    .sig { margin-top: 48px; border-top: 1px solid #333; width: 280px; padding-top: 8px; font-size: 0.85rem; }
-    @media print { body { margin: 24px; } }
-  </style>
-</head>
-<body>
-  <h1>Certificate of peer review</h1>
-  <p class="sub">Journal of Environmental Science and Management (JESAM)</p>
-  <div class="block">
-    <p>This certifies that</p>
-    <p><strong>${escapeHtml(input.reviewerName)}</strong><br />
-    <span style="font-size:0.9rem;color:#555">${escapeHtml(input.reviewerEmail)}</span></p>
-    <p>completed a peer review for manuscript <strong>${escapeHtml(input.manuscriptReference)}</strong> on <strong>${escapeHtml(completed)}</strong>.</p>
-  </div>
-  <div class="block">
-    <p style="font-size:0.9rem;"><strong>Title:</strong> ${escapedTitle}</p>
-  </div>
-  <p style="font-size:0.85rem;color:#555;">Assistive-only document for stakeholder workflow (Group 2 / SESAM). Final records remain in the editorial system.</p>
-  <div class="sig">JESAM Editorial Office</div>
-  <p style="font-size:0.8rem;margin-top:24px;">Use your browser <strong>Print</strong> dialog to print or save as PDF.</p>
-</body>
-</html>`;
+  const filenameRef = input.manuscriptReference.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const affiliation = input.affiliation?.trim() || "the reviewer directory";
+  const contentLeft = 86;
+  const contentWidth = pageWidth - contentLeft * 2;
 
-  // Do not use `noopener` on window.open here: with noopener, browsers may return `null` while still
-  // opening an about:blank tab, so document.write never runs and the user sees an empty window.
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const blobUrl = URL.createObjectURL(blob);
-  const w = window.open(blobUrl, "_blank", "popup,width=820,height=640");
-  if (!w) {
-    URL.revokeObjectURL(blobUrl);
-    return;
+  doc.setProperties({
+    title: `JESAM Peer Reviewer Certification - ${input.manuscriptReference}`,
+    subject: "JESAM peer reviewer certification",
+    author: "Journal of Environmental Science and Management",
+  });
+
+  try {
+    const header = await loadHeaderDataUrl();
+    doc.addImage(header, "PNG", 54, 36, pageWidth - 108, 96);
+  } catch (error) {
+    console.error("Could not embed certificate header image:", error);
+    drawFallbackHeader(doc, pageWidth);
   }
-  const revokeBlob = () => {
-    try {
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      /* ignore */
-    }
-  };
-  w.addEventListener(
-    "load",
-    () => {
-      const afterPrint = () => window.setTimeout(revokeBlob, 1_000);
-      w.addEventListener("afterprint", afterPrint, { once: true });
-      window.setTimeout(() => {
-        try {
-          w.focus();
-          w.print();
-        } catch {
-          /* user may print manually from the certificate tab */
-        }
-      }, 150);
-    },
-    { once: true }
-  );
-  // If afterprint never fires, still release the blob URL eventually
-  window.setTimeout(revokeBlob, 120_000);
-}
+  doc.setDrawColor(61, 74, 107);
+  doc.setLineWidth(1.2);
+  doc.line(72, 146, pageWidth - 72, 146);
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  doc.setFont("times", "normal");
+  doc.setFontSize(12);
+  doc.text(date, contentLeft, 190);
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(17);
+  doc.text("C E R T I F I C A T I O N", pageWidth / 2, 260, { align: "center" });
+
+  doc.setFont("times", "normal");
+  doc.setFontSize(12);
+  const body =
+    `This certifies that ${input.reviewerName}, Peer Reviewer at ${affiliation}, has served as a Peer Reviewer on ${date} for the paper, "${input.manuscriptTitle}", which was submitted for consideration in the Journal of Environmental Science and Management (JESAM).`;
+  drawBodyParagraph(doc, body, contentLeft, 326, contentWidth);
+
+  doc.setFont("times", "bold");
+  doc.text("THADDEUS P. LAWAS", contentLeft, 544);
+  doc.setFont("times", "normal");
+  doc.text("Managing Editor, JESAM", contentLeft, 562);
+
+  doc.setFontSize(9);
+  doc.setTextColor(107, 114, 128);
+  doc.text(`Reference: ${input.manuscriptReference}`, contentLeft, 704);
+  doc.text(`Reviewer email: ${input.reviewerEmail}`, contentLeft, 718);
+  doc.setTextColor(0, 0, 0);
+
+  const blob = doc.output("blob");
+  const base64 = await blobToBase64(blob);
+  return {
+    blob,
+    url: URL.createObjectURL(blob),
+    filename: `${filenameRef}-peer-reviewer-certification.pdf`,
+    base64,
+  };
 }

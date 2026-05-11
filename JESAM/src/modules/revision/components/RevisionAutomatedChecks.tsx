@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, FileText, Image, Loader2, XCircle } from "lucide-react";
-import type { AutomatedCheckSnapshot } from "@/types";
+import type { AutomatedCheckSnapshot, TemplateCheckReport } from "@/types";
 import {
   runAutomatedChecksSimulation,
   SIMILARITY_THRESHOLD_PERCENT,
@@ -11,10 +11,18 @@ type CheckStatus = "pending" | "checking" | "passed" | "failed";
 interface RevisionAutomatedChecksProps {
   file: File | null;
   manuscriptKey: string;
-  onResult: (result: { checks: AutomatedCheckSnapshot; pass: boolean; similarityScore: number } | null) => void;
+  fileUrl?: string | null;
+  onResult: (
+    result: {
+      checks: AutomatedCheckSnapshot;
+      pass: boolean;
+      similarityScore: number;
+      templateReport?: TemplateCheckReport;
+    } | null
+  ) => void;
 }
 
-export function RevisionAutomatedChecks({ file, manuscriptKey, onResult }: RevisionAutomatedChecksProps) {
+export function RevisionAutomatedChecks({ file, manuscriptKey, fileUrl, onResult }: RevisionAutomatedChecksProps) {
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
 
@@ -45,19 +53,28 @@ export function RevisionAutomatedChecks({ file, manuscriptKey, onResult }: Revis
       plagiarism: { status: "pending", message: "" },
     });
 
-    void runAutomatedChecksSimulation(file, (partial) => {
-      if (!cancelled) setChecks(partial);
-    }).then((out) => {
+    void runAutomatedChecksSimulation(
+      file,
+      (partial) => {
+        if (!cancelled) setChecks(partial);
+      },
+      { manuscriptId: manuscriptKey, fileUrl }
+    ).then((out) => {
       if (cancelled) return;
       setRunning(false);
       setChecks(out.checks);
-      onResultRef.current({ checks: out.checks, pass: out.pass, similarityScore: out.similarityScore });
+      onResultRef.current({
+        checks: out.checks,
+        pass: out.pass,
+        similarityScore: out.similarityScore,
+        templateReport: out.templateReport,
+      });
     });
 
     return () => {
       cancelled = true;
     };
-  }, [file, manuscriptKey]);
+  }, [file, manuscriptKey, fileUrl]);
 
   const getStatusIcon = (status: string) => {
     switch (status as CheckStatus) {
@@ -98,7 +115,7 @@ export function RevisionAutomatedChecks({ file, manuscriptKey, onResult }: Revis
         <h4 className="font-semibold text-gray-900">Automated checks (revised file)</h4>
         <p className="text-xs text-gray-600 mt-1">
           Same simulated gates as new submission: formatting, assets, similarity (threshold{" "}
-          {SIMILARITY_THRESHOLD_PERCENT}%). Editors may still verify manually.
+          {SIMILARITY_THRESHOLD_PERCENT}%). Use the results alongside manual review.
         </p>
       </div>
 
@@ -148,7 +165,7 @@ export function RevisionAutomatedChecks({ file, manuscriptKey, onResult }: Revis
         </p>
       )}
       {!running && allPassed && (
-        <p className="text-xs font-medium text-green-800">All checks passed — you can submit this revision.</p>
+        <p className="text-xs font-medium text-green-800">All checks passed.</p>
       )}
       {!running && !allPassed && checks.plagiarism.status === "failed" && (
         <p className="text-xs text-red-800">Similarity or other checks failed — fix the file and upload again.</p>

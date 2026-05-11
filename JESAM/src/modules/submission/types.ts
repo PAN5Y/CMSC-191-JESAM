@@ -51,7 +51,7 @@ export interface SubmissionStep {
 }
 
 // EIC Decision (submission phase)
-export type EditorDecision = "approve" | "reject" | "return-to-author";
+export type EditorDecision = "approve" | "reject";
 
 /** EIC / screening decision; `id` is the manuscripts row UUID. */
 export interface ScreeningDecision {

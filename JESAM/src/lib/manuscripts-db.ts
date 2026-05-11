@@ -52,13 +52,27 @@ export async function listManuscriptsFromDb(
 
   if (status) {
     query = query.eq("status", status);
+  } else if (role === "technical_editor") {
+    query = query.in("status", [
+      "Peer Review",
+      "Peer Review in Progress",
+      "Review Conducted",
+      "Editorial Review",
+      "Revision Requested",
+      "Checking",
+      "Returned to Author",
+      "Return to Revision",
+    ]);
   } else if (publicationStatusesOnly) {
     const pub = [
-      "Accepted",
-      "In Production",
+      "In Layout",
+      "Proofreading",
+      "Author Galley Review",
+      "Scheduled for Publication",
+      "In Issue Management",
       "Published",
-      "Return to Revision",
-      "Retracted",
+      "Archived",
+      "Declined",
     ] as const;
     query = query.in("status", [...pub]);
   }

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { MetadataForm } from "../components/MetadataForm";
 import { AuthorInformation } from "../components/AuthorInformation";
-import { AutomatedChecks } from "../components/AutomatedChecks";
+import { ManuscriptUpload } from "../components/ManuscriptUpload";
 import { AdministrativeCheck } from "../components/AdministrativeCheck";
 import { SubmissionSuccess } from "../components/SubmissionSuccess";
 import { SubmissionWizardProvider, useSubmissionWizard } from "../context/SubmissionWizardContext";
@@ -18,6 +18,17 @@ import {
   Loader2,
 } from "lucide-react";
 import type { Manuscript } from "@/types";
+import {
+  acknowledgementAuthorFirstName,
+  generateSubmissionAcknowledgementPdf,
+  type SubmissionAcknowledgementPdf,
+} from "@/lib/submission-acknowledgement";
+import { sendSubmissionAcknowledgementEmail } from "@/lib/workflow-email";
+import { getCorrespondingAuthorEmail } from "@/lib/workflow";
+
+function isUsableEmail(value: string | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+}
 
 type WorkflowStep = "metadata" | "authors" | "checks" | "admin" | "success";
 
@@ -26,15 +37,23 @@ function SubmissionWorkflowInner() {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("metadata");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<Manuscript | null>(null);
+  const [acknowledgement, setAcknowledgement] = useState<SubmissionAcknowledgementPdf | null>(null);
+  const [ackEmailStatus, setAckEmailStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
 
   const wizard = useSubmissionWizard();
   const { resetWizard } = wizard;
   const { createManuscript } = useSubmissions();
 
+  useEffect(() => {
+    return () => {
+      if (acknowledgement?.url) URL.revokeObjectURL(acknowledgement.url);
+    };
+  }, [acknowledgement?.url]);
+
   const steps = [
     { id: "metadata" as const, title: "Research Metadata", icon: FileText },
     { id: "authors" as const, title: "Author Information", icon: Users },
-    { id: "checks" as const, title: "Automated Checks", icon: CheckCircle2 },
+    { id: "checks" as const, title: "Manuscript Upload", icon: CheckCircle2 },
     { id: "admin" as const, title: "Author Declarations", icon: Shield },
   ];
 
@@ -68,6 +87,43 @@ function SubmissionWorkflowInner() {
       setSubmitting(false);
       if (created) {
         setSubmitted(created);
+        try {
+          const generated = await generateSubmissionAcknowledgementPdf(created);
+          setAcknowledgement((prev) => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return generated;
+          });
+          const recipientEmail = getCorrespondingAuthorEmail(created);
+          if (isUsableEmail(recipientEmail)) {
+            setAckEmailStatus("sending");
+            void (async () => {
+              const { error } = await sendSubmissionAcknowledgementEmail({
+                manuscript: created,
+                to: recipientEmail,
+                authorFirstName: acknowledgementAuthorFirstName(created),
+                pdfFilename: generated.filename,
+                pdfBase64: generated.base64,
+              });
+              if (error) {
+                setAckEmailStatus("failed");
+                toast.warning(`Submission saved, but acknowledgement email was not sent: ${error.message}`);
+              } else {
+                setAckEmailStatus("sent");
+                toast.success(`Acknowledgement email sent to ${recipientEmail}.`);
+              }
+            })();
+          } else {
+            setAckEmailStatus("failed");
+            toast.warning("Submission saved, but no valid corresponding author email was found.");
+          }
+        } catch (error) {
+          setAckEmailStatus("failed");
+          toast.warning(
+            error instanceof Error
+              ? `Submission saved, but acknowledgement PDF was not generated: ${error.message}`
+              : "Submission saved, but acknowledgement PDF was not generated."
+          );
+        }
         resetWizard();
         setCurrentStep("success");
       }
@@ -82,6 +138,11 @@ function SubmissionWorkflowInner() {
 
   const handleGoToDashboard = () => {
     setSubmitted(null);
+    setAcknowledgement((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+    setAckEmailStatus("idle");
     setCurrentStep("metadata");
     navigate("/author");
   };
@@ -148,7 +209,7 @@ function SubmissionWorkflowInner() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {currentStep === "metadata" && <MetadataForm />}
         {currentStep === "authors" && <AuthorInformation />}
-        {currentStep === "checks" && <AutomatedChecks />}
+        {currentStep === "checks" && <ManuscriptUpload />}
         {currentStep === "admin" && <AdministrativeCheck />}
         {currentStep === "success" && submitted && (
           <SubmissionSuccess
@@ -156,6 +217,9 @@ function SubmissionWorkflowInner() {
             manuscriptUuid={submitted.id}
             title={submitted.title}
             submittedAt={submitted.created_at}
+            acknowledgementUrl={acknowledgement?.url}
+            acknowledgementFilename={acknowledgement?.filename}
+            acknowledgementEmailStatus={ackEmailStatus}
             onGoToDashboard={handleGoToDashboard}
             onViewSubmission={handleViewSubmission}
           />

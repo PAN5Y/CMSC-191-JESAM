@@ -71,7 +71,7 @@ function validateMetadata(m: ResearchMetadata): boolean {
   return (
     m.title.trim().length > 0 &&
     m.abstract.trim().length > 0 &&
-    m.keywords.trim().length > 0 &&
+    m.keywords.length > 0 &&
     ["Land", "Air", "Water", "People"].includes(m.focus) &&
     m.subjectArea.trim().length > 0 &&
     m.funding.trim().length > 0 &&
@@ -88,18 +88,12 @@ function validateAuthors(list: Author[]): boolean {
     (a) =>
       a.name.trim().length > 0 &&
       a.email.trim().length > 0 &&
-      (a.orcid ?? "").trim().length > 0 &&
       a.affiliation.trim().length > 0
   );
 }
 
-function validateChecks(c: AutomatedCheckResult, hasFile: boolean): boolean {
-  if (!hasFile) return false;
-  return (
-    c.formatting.status === "passed" &&
-    c.assets.status === "passed" &&
-    c.plagiarism.status === "passed"
-  );
+function validateChecks(_c: AutomatedCheckResult, hasFile: boolean): boolean {
+  return hasFile;
 }
 
 function validateDeclarations(d: AdministrativeDeclarations): boolean {

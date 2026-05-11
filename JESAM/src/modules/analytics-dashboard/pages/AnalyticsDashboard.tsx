@@ -18,7 +18,8 @@ export default function AnalyticsDashboard() {
   const inReview = manuscripts.filter((m) => m.status === "Peer Review").length;
   const revision = manuscripts.filter((m) => m.status === "Revision Requested").length;
   const rejected = manuscripts.filter((m) => m.status === "Rejected").length;
-  const pendingFormat = manuscripts.filter((m) => m.status === "Pending Format Verification").length;
+  const initialScreening = manuscripts.filter((m) => m.status === "Initial Screening").length;
+  const productionChecks = manuscripts.filter((m) => m.status === "Production Checks").length;
 
   const focusStats = useMemo(() => {
     const stats = { Land: 0, Air: 0, Water: 0, People: 0 };
@@ -64,7 +65,8 @@ export default function AnalyticsDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
             ["Total", total.toString()],
-            ["Pending format", `${pendingFormat} (${pct(pendingFormat, total)})`],
+            ["Initial screening", `${initialScreening} (${pct(initialScreening, total)})`],
+            ["Production checks", `${productionChecks} (${pct(productionChecks, total)})`],
             ["Published", `${published} (${pct(published, total)})`],
             ["Peer Review", `${inReview} (${pct(inReview, total)})`],
             ["Revision", `${revision} (${pct(revision, total)})`],

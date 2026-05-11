@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronRight, Users, CheckCircle2, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,11 +15,19 @@ import {
   type ReviewerCompletedReviewRow,
 } from '@/lib/peer-review-db';
 import {
-  openReviewerCertificatePrint,
+  generateReviewerCertificatePdf,
+  reviewerAffiliationFromUser,
   reviewerDisplayNameFromUser,
+  type ReviewerCertificatePdf,
 } from '@/lib/reviewer-certificate';
+import { sendReviewerCertificateEmail } from '@/lib/workflow-email';
 
 type ActionLoading = 'accept' | 'decline' | 'submit' | null;
+
+function invitationTime(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
 
 function recommendationLabel(r: ReviewerRecommendation): string {
   switch (r) {
@@ -201,6 +209,8 @@ export default function ReviewerPortal() {
   const [loadingCompleted, setLoadingCompleted] = useState(true);
   const [actionLoading, setActionLoading] = useState<ActionLoading>(null);
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
+  const [certificate, setCertificate] = useState<ReviewerCertificatePdf | null>(null);
+  const [showCertificate, setShowCertificate] = useState(false);
 
   const myEmail = (user?.email ?? '').toLowerCase();
 
@@ -268,28 +278,42 @@ export default function ReviewerPortal() {
     void loadCompletedReviews();
   }, [myEmail, loadAssignments, loadCompletedReviews]);
 
+  useEffect(() => {
+    return () => {
+      if (certificate?.url) URL.revokeObjectURL(certificate.url);
+    };
+  }, [certificate?.url]);
+
+  const sortedAssignments = useMemo(
+    () =>
+      [...assignments].sort(
+        (a, b) => invitationTime(b.invitation.invitedAt) - invitationTime(a.invitation.invitedAt)
+      ),
+    [assignments]
+  );
+
   const selected =
-    assignments.find(
+    sortedAssignments.find(
       (a) => a.manuscript.id === selectedManuscriptId && a.invitation.id === selectedInvitationId
     ) ??
-    assignments.find((a) => a.manuscript.id === selectedManuscriptId) ??
-    assignments[0];
+    sortedAssignments.find((a) => a.manuscript.id === selectedManuscriptId) ??
+    sortedAssignments[0];
 
   const submissionForSelected = completedReviews.find(
     (c) => c.invitation.id === selected?.invitation.id
   );
 
   useEffect(() => {
-    if (assignments.length === 0) return;
-    const stillValid = assignments.some(
+    if (sortedAssignments.length === 0) return;
+    const stillValid = sortedAssignments.some(
       (a) => a.manuscript.id === selectedManuscriptId && a.invitation.id === selectedInvitationId
     );
     if (!stillValid) {
-      const first = assignments[0];
+      const first = sortedAssignments[0];
       setSelectedManuscriptId(first.manuscript.id);
       setSelectedInvitationId(first.invitation.id);
     }
-  }, [assignments, selectedManuscriptId, selectedInvitationId]);
+  }, [sortedAssignments, selectedManuscriptId, selectedInvitationId]);
 
   const chosenInvitationId = selectedInvitationId || selected?.invitation.id || '';
 
@@ -378,13 +402,45 @@ export default function ReviewerPortal() {
         toast.success('Review submitted. Thank you.');
         const ref =
           selected.manuscript.reference_code ?? selected.manuscript.id.slice(0, 8).toUpperCase();
-        openReviewerCertificatePrint({
-          reviewerName: reviewerDisplayNameFromUser(user),
-          reviewerEmail: myEmail,
-          manuscriptReference: ref,
-          manuscriptTitle: selected.manuscript.title,
-          completedAtIso: new Date().toISOString(),
-        });
+        const reviewerName = reviewerDisplayNameFromUser(user);
+        try {
+          const generatedCertificate = await generateReviewerCertificatePdf({
+            reviewerName,
+            reviewerEmail: myEmail,
+            manuscriptReference: ref,
+            manuscriptTitle: selected.manuscript.title,
+            completedAtIso: new Date().toISOString(),
+            affiliation: reviewerAffiliationFromUser(user),
+          });
+          setCertificate((prev) => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return generatedCertificate;
+          });
+          setShowCertificate(true);
+          if (myEmail) {
+            void (async () => {
+              const { error } = await sendReviewerCertificateEmail({
+                to: myEmail,
+                reviewerName,
+                manuscriptReference: ref,
+                manuscriptTitle: selected.manuscript.title,
+                pdfFilename: generatedCertificate.filename,
+                pdfBase64: generatedCertificate.base64,
+              });
+              if (error) {
+                toast.warning(`Review saved, but certificate email was not sent: ${error.message}`);
+              } else {
+                toast.success(`Reviewer certificate emailed to ${myEmail}.`);
+              }
+            })();
+          }
+        } catch (error) {
+          toast.warning(
+            error instanceof Error
+              ? `Review saved, but certificate PDF was not generated: ${error.message}`
+              : 'Review saved, but certificate PDF was not generated.'
+          );
+        }
         setSummary('');
         setMajorConcerns('');
         setMinorConcerns('');
@@ -462,7 +518,7 @@ export default function ReviewerPortal() {
                 </div>
               )}
               {!loadingAssignments &&
-                assignments.map(({ manuscript, invitation }) => (
+                sortedAssignments.map(({ manuscript, invitation }) => (
                   <button
                     key={invitation.id}
                     type="button"
@@ -480,9 +536,12 @@ export default function ReviewerPortal() {
                       {manuscript.reference_code ?? manuscript.id.slice(0, 8)}
                     </p>
                     <p className="text-xs text-gray-600">{invitation.status.toUpperCase()}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Invited {new Date(invitation.invitedAt).toLocaleString()}
+                    </p>
                   </button>
                 ))}
-              {!loadingAssignments && assignments.length === 0 && (
+              {!loadingAssignments && sortedAssignments.length === 0 && (
                 <p className="text-sm text-gray-500">No invitations assigned.</p>
               )}
             </div>
@@ -502,6 +561,9 @@ export default function ReviewerPortal() {
                   <h2 className="text-lg font-semibold text-gray-900">
                     {selected.manuscript.title}
                   </h2>
+                  <p className="text-sm text-gray-600">
+                    Invited: {new Date(selected.invitation.invitedAt).toLocaleString()}
+                  </p>
                   <p className="text-sm text-gray-600">
                     Due: {new Date(selected.invitation.dueAt).toLocaleDateString()}
                   </p>
@@ -675,6 +737,30 @@ export default function ReviewerPortal() {
           )}
         </section>
       </div>
+      {showCertificate && certificate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">Peer Reviewer Certificate</h3>
+                <p className="text-xs text-gray-500">{certificate.filename}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCertificate(false)}
+                className="rounded-md p-1 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <iframe
+              src={certificate.url}
+              title="Peer reviewer certificate PDF"
+              className="h-[75vh] w-full bg-gray-100"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

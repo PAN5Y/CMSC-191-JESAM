@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:vercel": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -42,8 +43,11 @@
     "dotenv": "^17.4.2",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
     "lucide-react": "0.487.0",
+    "mammoth": "^1.12.0",
     "next-themes": "^0.4.6",
+    "pdfjs-dist": "^5.7.284",
     "react": "18.3.1",
     "react-day-picker": "^9.14.0",
     "react-dom": "18.3.1",

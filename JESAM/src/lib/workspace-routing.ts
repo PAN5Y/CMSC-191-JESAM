@@ -7,9 +7,12 @@ import type { AppRole } from "@/types";
 export function getWorkspaceHomePath(role: AppRole): string {
   if (role === "editor_in_chief") return "/submission/screening";
   if (role === "reviewer") return "/peer-review/reviewer";
-  if (role === "production_editor") return "/publication/dashboard";
-  if (role === "associate_editor" || role === "managing_editor" || role === "system_admin") {
+  if (role === "technical_editor") return "/peer-review";
+  if (role === "production_editor") return "/production/pre-review";
+  if (role === "managing_editor") return "/submission/screening";
+  if (role === "associate_editor" || role === "system_admin") {
     return "/submission/queue";
   }
+  if (role === "technical_editor") return "/revision";
   return "/author";
 }
