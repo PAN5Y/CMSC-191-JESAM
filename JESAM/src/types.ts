@@ -47,6 +47,20 @@ export const PUBLICATION_PIPELINE_STATUSES: ManuscriptStatus[] = [
   "Declined"
 ];
 
+/** A public comment posted on a published article. */
+export interface ArticleComment {
+  id: string;
+  manuscript_id: string;
+  user_id: string;
+  content: string;
+  is_edited: boolean;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+    role: string;
+  };
+}
+
 export type AppRole =
   | "author"
   | "reviewer"

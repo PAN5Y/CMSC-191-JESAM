@@ -39,9 +39,11 @@ export const router = createBrowserRouter([
   { path: "/register", element: <RegisterPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
   { path: "/article/public/:id", element: <PublicArticlePage /> },
-  { path: "/browse", element: <JournalsDashboard /> },
-  { path: "/journals/public", element: <Navigate to="/browse" replace /> },
-  { path: "/journals", element: <Navigate to="/browse" replace /> },
+  // Landing page — visible to everyone, sidebar shown for authenticated users
+  { path: "/", element: <JournalsDashboard /> },
+  { path: "/browse", element: <Navigate to="/" replace /> },
+  { path: "/journals/public", element: <Navigate to="/" replace /> },
+  { path: "/journals", element: <Navigate to="/" replace /> },
 
   // ── Author-only routes ──
   {
@@ -68,9 +70,9 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // ── Internal landing (role-aware) ──
+  // ── Internal workspace landing (role-aware redirect for authenticated users) ──
   {
-    path: "/",
+    path: "/workspace",
     element: (
       <ProtectedRoute
         allowedRoles={[

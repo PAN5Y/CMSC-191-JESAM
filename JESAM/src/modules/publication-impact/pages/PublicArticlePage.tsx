@@ -13,6 +13,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Manuscript } from "../types";
 import { CHATBOT_FAQ, answerWorkflowQuestion } from "@/lib/workflow-assistant";
+import ArticleComments from "@/modules/journals-dashboard/components/ArticleComments";
+import ConnectedPapersGraph from "@/modules/journals-dashboard/components/ConnectedPapersGraph";
 
 type RelatedRow = Pick<Manuscript, "id" | "title" | "reference_code" | "classification">;
 
@@ -220,7 +222,7 @@ export default function PublicArticlePage() {
           <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
             The article you&apos;re looking for does not exist or may have been removed.
           </p>
-          <Link to="/browse" className="inline-block mt-4 text-sm text-[#3f4b7e] hover:underline">
+          <Link to="/" className="inline-block mt-4 text-sm text-[#3f4b7e] hover:underline">
             Back to journals browse
           </Link>
         </div>
@@ -233,7 +235,7 @@ export default function PublicArticlePage() {
       <header className="bg-[#3f4b7e] text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4">
           <Link
-            to="/browse"
+            to="/"
             className="inline-flex items-center gap-1 text-sm text-white/85 hover:text-white mb-4 font-['Public_Sans',sans-serif]"
           >
             <ChevronLeft className="size-4" />
@@ -346,34 +348,12 @@ export default function PublicArticlePage() {
               </div>
             </div>
 
+            {/* ── Connected Papers Graph Explorer ── */}
             {related.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-[#e0e0e0] p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <BookOpen className="size-5 text-[#3f4b7e]" />
-                  <h2 className="font-['Newsreader',serif] text-[20px] text-[#1a1c1c]">
-                    Connected papers (JESAM)
-                  </h2>
-                </div>
-                <p className="text-xs text-[#6b7280] mb-4 font-['Public_Sans',sans-serif]">
-                  Linked publications—same focus area first, then broader corpus.
-                </p>
-                <ul className="space-y-3">
-                  {related.map((r) => (
-                    <li key={r.id}>
-                      <Link
-                        to={`/article/public/${r.id}`}
-                        className="text-sm text-[#3f4b7e] hover:underline font-medium font-['Public_Sans',sans-serif]"
-                      >
-                        {r.title}
-                      </Link>
-                      <p className="text-xs text-[#9e9e9e] mt-0.5">
-                        {r.reference_code ?? r.id.slice(0, 8)}
-                        {r.classification ? ` · ${r.classification}` : ""}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <ConnectedPapersGraph
+                seed={manuscript}
+                related={related}
+              />
             )}
 
             {manuscript.file_url && (
@@ -394,6 +374,9 @@ export default function PublicArticlePage() {
                 </button>
               </div>
             )}
+
+            {/* ── Comment Thread ── */}
+            <ArticleComments manuscriptId={manuscript.id} />
 
             <footer className="text-center text-xs text-[#9e9e9e] font-['Public_Sans',sans-serif] pt-4">
               <p>

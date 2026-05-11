@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router';
+import { NavLink, Link } from 'react-router';
 import { Settings, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSidebarItems } from '@/lib/nav-permissions';
@@ -51,30 +51,46 @@ export default function Sidebar() {
 
       {/* User info + Footer */}
       <div className="hidden md:block p-4 border-t border-white/10 space-y-3">
-        {/* Logged-in user */}
-        {user && (
-          <div className="px-4 py-3 bg-white/5 rounded-lg">
-            <div className="text-sm font-['Public_Sans',sans-serif] text-white truncate">
-              {user.email}
+        {user ? (
+          <>
+            <div className="px-4 py-3 bg-white/5 rounded-lg">
+              <div className="text-sm font-['Public_Sans',sans-serif] text-white truncate">
+                {user.email}
+              </div>
+              <div className="text-[10px] text-white/50 font-['Public_Sans',sans-serif] uppercase tracking-wider mt-0.5">
+                {role?.replace(/_/g, ' ') || 'User'}
+              </div>
             </div>
-            <div className="text-[10px] text-white/50 font-['Public_Sans',sans-serif] uppercase tracking-wider mt-0.5">
-              {role?.replace(/_/g, ' ') || 'User'}
-            </div>
+
+            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 font-['Public_Sans',sans-serif] text-sm transition-colors">
+              <Settings className="size-5" />
+              Settings
+            </button>
+
+            <button
+              onClick={signOut}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-[#c62828]/20 hover:text-[#ffcdd2] font-['Public_Sans',sans-serif] text-sm transition-colors"
+            >
+              <LogOut className="size-5" />
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Link
+              to="/login"
+              className="w-full text-center px-4 py-2.5 rounded-lg text-white/90 hover:text-white hover:bg-white/10 font-['Public_Sans',sans-serif] text-sm transition-colors"
+            >
+              Log in
+            </Link>
+            <Link
+              to="/register"
+              className="w-full text-center px-4 py-2.5 rounded-lg bg-[#F5C344] text-[#3f4b7e] font-bold font-['Public_Sans',sans-serif] text-sm hover:bg-[#f0bd3a] transition-colors"
+            >
+              Sign up
+            </Link>
           </div>
         )}
-
-        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 font-['Public_Sans',sans-serif] text-sm transition-colors">
-          <Settings className="size-5" />
-          Settings
-        </button>
-
-        <button
-          onClick={signOut}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-[#c62828]/20 hover:text-[#ffcdd2] font-['Public_Sans',sans-serif] text-sm transition-colors"
-        >
-          <LogOut className="size-5" />
-          Sign Out
-        </button>
       </div>
     </aside>
   );
