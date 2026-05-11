@@ -20,6 +20,7 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, Legend,
 } from "recharts";
 import { useSubmissions } from "@/modules/submission/hooks/useSubmissions";
+import { GA_MEASUREMENT_ID } from "@/lib/analytics";
 import type { Manuscript, JournalClassification } from "@/types";
 
 // ─── GA4 ─────────────────────────────────────────────────────
@@ -29,12 +30,45 @@ declare global {
     dataLayer?: unknown[];
   }
 }
-const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
+const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) ?? GA_MEASUREMENT_ID;
 function gaEvent(name: string, params?: Record<string, unknown>) {
   if (typeof window.gtag === "function" && GA_ID) {
     window.gtag("event", name, { ...params, send_to: GA_ID });
   }
 }
+
+type GaSummary = {
+  totals: {
+    pageViews: number;
+    activeUsers: number;
+    events: number;
+    paperViews: number;
+    engagementRate: number;
+    averageSessionDuration: number;
+  };
+  topPapers: {
+    path: string;
+    title: string;
+    views: number;
+  }[];
+  trend: {
+    date: string;
+    pageViews: number;
+    activeUsers: number;
+  }[];
+  devices: {
+    name: string;
+    value: number;
+  }[];
+  sources: {
+    name: string;
+    value: number;
+  }[];
+  countries: {
+    name: string;
+    value: number;
+  }[];
+};
 
 // ─── Brand colour (sidebar / active states) ───────────────────
 const BRAND = "#3f4b7e";
@@ -61,12 +95,25 @@ const STATUS_COLORS: Record<string, string> = {
   "Retracted":                   "#e11d48",
 };
 
+const GA_CHART_COLORS = ["#3f4b7e", "#38bdf8", "#34d399", "#F5C344", "#fb923c", "#818cf8", "#f472b6", "#94a3b8"];
+
 type TimeRange = "all" | "30d" | "90d" | "1y";
 
 // ─── Utilities ───────────────────────────────────────────────
 function pct(part: number, whole: number) {
   if (!whole) return 0;
   return Math.round((part / whole) * 100);
+}
+
+function formatPercent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
 }
 
 function filterByTimeRange(manuscripts: Manuscript[], range: TimeRange): Manuscript[] {
@@ -218,6 +265,9 @@ function KpiCard({
 export default function AnalyticsDashboard() {
   const { manuscripts, fetchManuscripts } = useSubmissions();
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
+  const [gaSummary, setGaSummary] = useState<GaSummary | null>(null);
+  const [gaLoading, setGaLoading] = useState(false);
+  const [gaError, setGaError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window.gtag === "function" && GA_ID) {
@@ -227,6 +277,43 @@ export default function AnalyticsDashboard() {
   }, []);
 
   useEffect(() => { void fetchManuscripts(); }, [fetchManuscripts]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchGaSummary() {
+      setGaLoading(true);
+      setGaError(null);
+
+      try {
+        const response = await fetch(`/api/ga-summary?range=${encodeURIComponent(timeRange)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to load Google Analytics data.");
+        }
+
+        if (!cancelled) {
+          setGaSummary(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setGaError(error instanceof Error ? error.message : "Unable to load Google Analytics data.");
+          setGaSummary(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setGaLoading(false);
+        }
+      }
+    }
+
+    void fetchGaSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [timeRange]);
 
   const handleRange = useCallback((r: TimeRange) => {
     setTimeRange(r);
@@ -342,6 +429,231 @@ export default function AnalyticsDashboard() {
             <KpiCard label="Citations"    value={impact.citations.toLocaleString()} accentColor="#F5C344" />
           </div>
         </section>
+
+        {/* ── Google Analytics ── */}
+        <section>
+          <SectionLabel>Google Analytics</SectionLabel>
+          {gaError ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+              <strong>Google Analytics reporting is not available yet.</strong>{" "}
+              {gaError}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <KpiCard
+                  label="Site Views"
+                  value={gaLoading ? "..." : (gaSummary?.totals.pageViews ?? 0).toLocaleString()}
+                  sub="GA4 page views"
+                  accentColor={BRAND}
+                />
+                <KpiCard
+                  label="Active Users"
+                  value={gaLoading ? "..." : (gaSummary?.totals.activeUsers ?? 0).toLocaleString()}
+                  sub="Visitors"
+                  accentColor="#38bdf8"
+                />
+                <KpiCard
+                  label="Paper Views"
+                  value={gaLoading ? "..." : (gaSummary?.totals.paperViews ?? 0).toLocaleString()}
+                  sub="paper_view events"
+                  accentColor="#34d399"
+                />
+                <KpiCard
+                  label="Events"
+                  value={gaLoading ? "..." : (gaSummary?.totals.events ?? 0).toLocaleString()}
+                  sub="All GA events"
+                  accentColor="#F5C344"
+                />
+                <KpiCard
+                  label="Engagement"
+                  value={gaLoading ? "..." : formatPercent(gaSummary?.totals.engagementRate ?? 0)}
+                  sub="Engagement rate"
+                  accentColor="#fb923c"
+                />
+                <KpiCard
+                  label="Avg Session"
+                  value={gaLoading ? "..." : formatDuration(gaSummary?.totals.averageSessionDuration ?? 0)}
+                  sub="Visit duration"
+                  accentColor="#818cf8"
+                />
+              </div>
+
+              <Card className="p-4">
+                <CardHeading>Top Public Paper Pages</CardHeading>
+                <CardSubLabel>GA4 page views for public article pages</CardSubLabel>
+                {gaLoading ? (
+                  <p className="text-sm text-gray-500">Loading Google Analytics data...</p>
+                ) : gaSummary?.topPapers.length ? (
+                  <div className="space-y-3">
+                    {gaSummary.topPapers.map((paper) => (
+                      <a
+                        key={paper.path}
+                        href={paper.path}
+                        className="flex items-start justify-between gap-3 rounded-md px-2 py-1.5 -mx-2 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#3f4b7e]/20"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate hover:text-[#3f4b7e]">{paper.title}</p>
+                          <p className="text-xs text-gray-400 truncate">{paper.path}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 flex-shrink-0">
+                          {paper.views.toLocaleString()}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No public article views found for the selected range yet.
+                  </p>
+                )}
+              </Card>
+            </div>
+          )}
+        </section>
+
+        {!gaError && (
+          <section>
+            <SectionLabel>Reader Trends</SectionLabel>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="p-4 lg:col-span-2">
+                <CardHeading>Views and Active Users Over Time</CardHeading>
+                <CardSubLabel>Daily GA4 traffic for the selected range</CardSubLabel>
+                {gaLoading ? (
+                  <p className="text-sm text-gray-500">Loading traffic trends...</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={gaSummary?.trend ?? []} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="ga-page-views" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={BRAND} stopOpacity={0.2} />
+                          <stop offset="95%" stopColor={BRAND} stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="ga-active-users" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.22} />
+                          <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Area type="monotone" dataKey="pageViews" name="Page views" stroke={BRAND} strokeWidth={2} fill="url(#ga-page-views)" />
+                      <Area type="monotone" dataKey="activeUsers" name="Active users" stroke="#38bdf8" strokeWidth={2} fill="url(#ga-active-users)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
+
+              <Card className="p-4">
+                <CardHeading>Top Public Paper Pages</CardHeading>
+                <CardSubLabel>Ranked by GA4 page views</CardSubLabel>
+                {gaLoading ? (
+                  <p className="text-sm text-gray-500">Loading paper performance...</p>
+                ) : gaSummary?.topPapers.length ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart
+                      data={gaSummary.topPapers.map((paper) => ({
+                        ...paper,
+                        label: paper.title.length > 22 ? `${paper.title.slice(0, 20)}...` : paper.title,
+                      }))}
+                      layout="vertical"
+                      margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                      <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="label" width={125} tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "#f9fafb" }} />
+                      <Bar dataKey="views" fill={BRAND} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-gray-500">No public article views found for the selected range yet.</p>
+                )}
+              </Card>
+            </div>
+          </section>
+        )}
+
+        {!gaError && (
+          <section>
+            <SectionLabel>Audience Insights</SectionLabel>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="p-4">
+                <CardHeading>Device Category</CardHeading>
+                <CardSubLabel>Active users by device</CardSubLabel>
+                {gaLoading ? (
+                  <p className="text-sm text-gray-500">Loading devices...</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={230}>
+                    <PieChart>
+                      <Pie
+                        data={gaSummary?.devices ?? []}
+                        cx="50%" cy="50%"
+                        innerRadius={52} outerRadius={84}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {(gaSummary?.devices ?? []).map((d, index) => (
+                          <Cell key={d.name} fill={GA_CHART_COLORS[index % GA_CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
+
+              <Card className="p-4">
+                <CardHeading>Traffic Source</CardHeading>
+                <CardSubLabel>Sessions by default channel group</CardSubLabel>
+                {gaLoading ? (
+                  <p className="text-sm text-gray-500">Loading sources...</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={230}>
+                    <PieChart>
+                      <Pie
+                        data={gaSummary?.sources ?? []}
+                        cx="50%" cy="50%"
+                        innerRadius={52} outerRadius={84}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {(gaSummary?.sources ?? []).map((d, index) => (
+                          <Cell key={d.name} fill={GA_CHART_COLORS[(index + 2) % GA_CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
+
+              <Card className="p-4">
+                <CardHeading>Top Countries</CardHeading>
+                <CardSubLabel>Active users by country</CardSubLabel>
+                {gaLoading ? (
+                  <p className="text-sm text-gray-500">Loading countries...</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={230}>
+                    <BarChart data={gaSummary?.countries ?? []} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                      <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" width={95} tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "#f9fafb" }} />
+                      <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
+            </div>
+          </section>
+        )}
 
         {/* ── Journal Focus Analysis ── */}
         <section>
