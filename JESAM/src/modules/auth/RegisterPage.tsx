@@ -29,7 +29,7 @@ const labelClasses =
 
 function AuthVisualPanel() {
   return (
-    <div className="relative min-h-40 bg-[#1f352c] lg:min-h-[820px]">
+    <div className="relative min-h-40 bg-[#1f352c] lg:h-full lg:min-h-0">
       <img
         src="/JESAM Collage.png"
         alt=""
@@ -114,9 +114,9 @@ export default function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1a1c1c] via-[#2d3a6b] to-[#3f4b7e] flex items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:grid-cols-[312px_minmax(520px,1fr)]">
+        <div className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:h-[720px] lg:grid-cols-[274px_minmax(520px,1fr)]">
           <AuthVisualPanel />
-          <div className="flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
+          <div className="flex items-center justify-center px-5 py-10 sm:px-8 lg:h-full lg:px-12">
             <div className="w-full max-w-md text-center">
               <img
                 src="logos/UPLB LOGO w SESAM.png"
@@ -164,10 +164,10 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1a1c1c] via-[#2d3a6b] to-[#3f4b7e] flex items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-7xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:grid-cols-[312px_minmax(640px,1fr)]">
+      <div className="w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 lg:grid lg:h-[720px] lg:grid-cols-[274px_minmax(520px,1fr)]">
         <AuthVisualPanel />
 
-        <div className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
+        <div className="flex items-start justify-center overflow-y-auto px-5 py-8 sm:px-8 lg:h-full lg:px-12">
           <div className="w-full max-w-3xl">
             <img
               src="logos/UPLB LOGO w SESAM.png"

@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listPublishedManuscriptsPublic } from "@/lib/manuscripts-db";
 import type { Manuscript } from "@/types";
 import PublicHeader from "@/components/layout/PublicHeader";
 import { Link } from "react-router";
+import { trackPublicPageView } from "@/lib/analytics";
 
 export default function JournalsDashboard() {
   const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [focus, setFocus] = useState<"all" | "Land" | "Air" | "Water" | "People">("all");
+  const trackedPageView = useRef(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -24,6 +26,12 @@ export default function JournalsDashboard() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (trackedPageView.current) return;
+    trackedPageView.current = true;
+    trackPublicPageView("/browse", "JESAM Journals Browse");
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
