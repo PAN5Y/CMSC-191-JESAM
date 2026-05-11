@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, useLocation } from "react-router";
 import AppLayout from "./components/layout/AppLayout";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import LoginPage from "./modules/auth/LoginPage";
@@ -9,6 +9,9 @@ import ProductionPreReviewDashboard from "./modules/production/pages/ProductionP
 import ProductionPreReviewDetail from "./modules/production/pages/ProductionPreReviewDetail";
 import ArticleDetail from "./modules/publication-impact/pages/ArticleDetail";
 import PublicArticlePage from "./modules/publication-impact/pages/PublicArticlePage";
+import JournalsDashboardPage from "./modules/journals-dashboard/pages/JournalsDashboardPage";
+import JournalDetailPage from "./modules/journals-dashboard/pages/JournalDetailPage";
+import ArticleDetailPage from "./modules/journals-dashboard/pages/ArticleDetailPage";
 import SubmissionDashboard from "./modules/submission/pages/SubmissionDashboard";
 import SubmissionWorkflow from "./modules/submission/pages/SubmissionWorkflow";
 import EditorDashboard from "./modules/submission/pages/EditorDashboard";
@@ -34,16 +37,33 @@ function InternalHomeRedirect() {
   return <Navigate to={getWorkspaceHomePath(role)} replace />;
 }
 
+function LegacyJournalsAliasRedirect() {
+  const location = useLocation();
+
+  return (
+    <Navigate
+      to={{
+        pathname: "/journals",
+        search: location.search,
+        hash: location.hash,
+      }}
+      replace
+    />
+  );
+}
+
 export const router = createBrowserRouter([
   // ── Public routes (no auth required) ──
   {path: "/home", element: <LandingPage />},
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/unauthorized", element: <UnauthorizedPage /> },
+  { path: "/journals", element: <JournalsDashboardPage /> },
+  { path: "/journals/:journalId", element: <JournalDetailPage /> },
+  { path: "/journals/articles/:articleId", element: <ArticleDetailPage /> },
   { path: "/article/public/:id", element: <PublicArticlePage /> },
-  { path: "/browse", element: <JournalsDashboard /> },
-  { path: "/journals/public", element: <Navigate to="/browse" replace /> },
-  { path: "/journals", element: <Navigate to="/browse" replace /> },
+  { path: "/browse", element: <LegacyJournalsAliasRedirect /> },
+  { path: "/journals/public", element: <LegacyJournalsAliasRedirect /> },
 
   // ── Author-only routes ──
   {

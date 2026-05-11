@@ -10,7 +10,7 @@ export default function PublicHeader() {
     return (
       <header className="bg-[#3f4b7e] text-white border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
-          <Link to="/browse" className="font-['Newsreader',serif] text-xl tracking-tight hover:text-white/90 shrink-0">
+          <Link to="/journals" className="font-['Newsreader',serif] text-xl tracking-tight hover:text-white/90 shrink-0">
             JESAM
           </Link>
           <div className="flex items-center gap-3 sm:gap-4 min-w-0 font-['Public_Sans',sans-serif] text-sm">
@@ -39,7 +39,7 @@ export default function PublicHeader() {
   return (
     <header className="bg-[#3f4b7e] text-white border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-        <Link to="/browse" className="font-['Newsreader',serif] text-xl tracking-tight hover:text-white/90">
+        <Link to="/journals" className="font-['Newsreader',serif] text-xl tracking-tight hover:text-white/90">
           JESAM
         </Link>
         <nav className="flex items-center gap-4 font-['Public_Sans',sans-serif] text-sm">

@@ -17,7 +17,7 @@ import { trackPublicPageView, trackPublicPaperView } from "@/lib/analytics";
 
 type RelatedRow = Pick<Manuscript, "id" | "title" | "reference_code" | "classification">;
 
-function PublicReaderAssistant({ aiSummary }: { aiSummary: string }) {
+function PublicReaderAssistant({ summary }: { summary?: string | null }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<{ id: string; role: "user" | "assistant"; text: string }[]>(
     [
@@ -42,13 +42,14 @@ function PublicReaderAssistant({ aiSummary }: { aiSummary: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-200 p-5">
-        <h2 className="font-['Newsreader',serif] text-[18px] text-[#1a1c1c] mb-2">AI assistive summary</h2>
-        <p className="text-xs text-[#6b7280] font-['Public_Sans',sans-serif] mb-3">
-          Assistive-only interpretation (proposal: split view with summary + assistant).
-        </p>
-        <p className="text-sm text-[#374151] font-['Public_Sans',sans-serif] leading-relaxed">{aiSummary}</p>
-      </div>
+      {summary ? (
+        <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-200 p-5">
+          <h2 className="font-['Newsreader',serif] text-[18px] text-[#1a1c1c] mb-2">Summary</h2>
+          <p className="text-sm text-[#374151] font-['Public_Sans',sans-serif] leading-relaxed">
+            {summary}
+          </p>
+        </div>
+      ) : null}
       <div className="bg-white rounded-lg shadow-sm border border-[#e0e0e0] p-5">
         <h3 className="font-semibold text-[#1a1c1c] mb-2 font-['Public_Sans',sans-serif]">
           Workflow assistant (chatbot)
@@ -201,13 +202,9 @@ export default function PublicArticlePage() {
     window.open(manuscript.file_url, "_blank");
   };
 
-  const aiSummary =
-    manuscript?.submission_metadata?.ai_summary?.short ??
-    (manuscript
-      ? `This article discusses ${manuscript.classification ?? "environmental"} research with focus on ${
-          manuscript.keywords.slice(0, 3).join(", ") || "key JESAM themes"
-        }. This assistive summary is generated for reader orientation and is not a replacement for full peer-reviewed content.`
-      : "");
+  const summary =
+    manuscript?.public_summary ??
+    manuscript?.submission_metadata?.ai_summary?.short;
 
   if (loading) {
     return (
@@ -233,7 +230,7 @@ export default function PublicArticlePage() {
           <p className="text-sm text-[#6b7280] font-['Public_Sans',sans-serif]">
             The article you&apos;re looking for does not exist or may have been removed.
           </p>
-          <Link to="/browse" className="inline-block mt-4 text-sm text-[#3f4b7e] hover:underline">
+          <Link to="/journals" className="inline-block mt-4 text-sm text-[#3f4b7e] hover:underline">
             Back to journals browse
           </Link>
         </div>
@@ -246,7 +243,7 @@ export default function PublicArticlePage() {
       <header className="bg-[#3f4b7e] text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4">
           <Link
-            to="/browse"
+            to="/journals"
             className="inline-flex items-center gap-1 text-sm text-white/85 hover:text-white mb-4 font-['Public_Sans',sans-serif]"
           >
             <ChevronLeft className="size-4" />
@@ -420,7 +417,7 @@ export default function PublicArticlePage() {
           </div>
 
           <aside className="w-full lg:w-[38%] lg:max-w-md mt-8 lg:mt-0 lg:sticky lg:top-6 shrink-0 space-y-6 self-start">
-            <PublicReaderAssistant aiSummary={aiSummary} />
+            <PublicReaderAssistant summary={summary} />
           </aside>
         </div>
       </main>
